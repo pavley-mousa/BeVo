@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 
 type Row = Record<string, any>;
 type Section = "overview" | "courses" | "admin" | "scope" | "tasks" | "resources" | "requests" | "notifications" | "users" | "profile";
-type AuthScreen = "login" | "signup" | "verify" | "forgot";
+type AuthScreen = "login" | "signup" | "verify" | "forgot" | "reset";
 
 type WorkspaceData = {
   colleges: Row[];
@@ -88,6 +88,7 @@ export default function BeVoApp() {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [resetPasswordDraft, setResetPasswordDraft] = useState({ password: "", confirm: "" });
   const [otp, setOtp] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
@@ -137,10 +138,11 @@ export default function BeVoApp() {
     }).catch((error: unknown) => {
       if (live) notify(messageOf(error), "error");
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!live) return;
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
+      if (event === "PASSWORD_RECOVERY") setAuthScreen("reset");
     });
     return () => {
       live = false;
@@ -175,12 +177,19 @@ export default function BeVoApp() {
     const load = async () => {
       setBusy(true);
       const fetchRows = async (table: string): Promise<Row[]> => {
-        const { data: rows, error } = await supabase.from(table).select("*").limit(400);
-        if (error) {
-          console.warn("BeVo data read:", table, error.message);
-          return [];
+        const pageSize = 400;
+        const allRows: Row[] = [];
+        for (let offset = 0; ; offset += pageSize) {
+          const { data: rows, error } = await supabase.from(table).select("*").range(offset, offset + pageSize - 1);
+          if (error) {
+            console.warn("BeVo data read:", table, error.message);
+            throw new Error(`تعذر تحميل بيانات ${table}: ${error.message}`);
+          }
+          const page = (rows || []) as Row[];
+          allRows.push(...page);
+          if (page.length < pageSize) break;
         }
-        return (rows || []) as Row[];
+        return allRows;
       };
       try {
         const names = [
@@ -366,6 +375,28 @@ export default function BeVoApp() {
       if (error) throw error;
       notify("لو كان البريد مسجلًا، ستصلك رسالة استعادة كلمة المرور.", "success");
       setAuthScreen("login");
+    } catch (error) { notify(messageOf(error), "error"); }
+    finally { setBusy(false); }
+  }
+
+  async function updatePasswordFromRecovery(event: FormEvent) {
+    event.preventDefault();
+    if (resetPasswordDraft.password.length < 8) {
+      notify("كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف.", "error");
+      return;
+    }
+    if (resetPasswordDraft.password !== resetPasswordDraft.confirm) {
+      notify("كلمتا المرور غير متطابقتين.", "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: resetPasswordDraft.password });
+      if (error) throw error;
+      setResetPasswordDraft({ password: "", confirm: "" });
+      setAuthScreen("login");
+      setActiveSection("overview");
+      notify("تم تحديث كلمة المرور بنجاح.", "success");
     } catch (error) { notify(messageOf(error), "error"); }
     finally { setBusy(false); }
   }
@@ -750,6 +781,24 @@ export default function BeVoApp() {
     setMobileNav(false);
   }
   const currentSectionLabel = navItems.find((item) => item.id === activeSection)?.label || "نظرة عامة";
+
+  if (session?.user && authScreen === "reset") {
+    return (
+      <main className="profile-setup-page" dir="rtl" lang="ar">
+        <div className="brand-lockup dark"><span className="brand-mark">B</span><div><strong>BeVo</strong><small>استعادة كلمة المرور</small></div></div>
+        <form className="profile-setup-card" onSubmit={updatePasswordFromRecovery}>
+          <span className="card-symbol"><ShieldCheck size={23} /></span>
+          <h1>تعيين كلمة مرور جديدة</h1>
+          <p className="muted">اختر كلمة مرور جديدة لا تقل عن 8 أحرف.</p>
+          <InputField label="كلمة المرور الجديدة"><input required type="password" autoComplete="new-password" minLength={8} value={resetPasswordDraft.password} onChange={(e) => setResetPasswordDraft({ ...resetPasswordDraft, password: e.target.value })} /></InputField>
+          <InputField label="تأكيد كلمة المرور الجديدة"><input required type="password" autoComplete="new-password" value={resetPasswordDraft.confirm} onChange={(e) => setResetPasswordDraft({ ...resetPasswordDraft, confirm: e.target.value })} /></InputField>
+          <button className="btn btn-primary btn-wide" type="submit" disabled={busy}>{busy ? "جاري تحديث كلمة المرور…" : "حفظ كلمة المرور"} <Check size={17} /></button>
+          <button className="text-button" type="button" onClick={signOut}>إلغاء والعودة لتسجيل الدخول</button>
+        </form>
+        {notice ? <div className={`toast toast-${notice.tone}`} role="status">{notice.text}</div> : null}
+      </main>
+    );
+  }
 
   if (!session?.user) {
     return (
