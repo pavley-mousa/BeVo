@@ -263,6 +263,9 @@ export default function BeVoApp() {
   const isAcademicAdmin = isRoot || isCollegeAdmin || isYearAdmin;
   const isAdmin = isAcademicAdmin || isScopeAdmin || isInstructor;
   const selectedYearIds = data.years.filter((row) => row.is_current && row.is_active).map((row) => row.id);
+  const hasCurrentYearForStudent = data.years.some((row) =>
+    row.college_id === profile?.college_id && row.is_current && row.is_active
+  );
   const studentOfferings = data.offerings.filter((offering) =>
     offering.is_active &&
     Boolean(profile?.college_id) &&
@@ -627,6 +630,13 @@ export default function BeVoApp() {
     setBusy(true);
     try {
       if (!taskForm.offeringId || !taskForm.title.trim()) throw new Error("حدد المادة والعنوان.");
+      if (!manageableOfferings.some((offering) => offering.id === taskForm.offeringId)) {
+        throw new Error("المادة خارج نطاق الصلاحيات المعيّنة لك.");
+      }
+      if (isGroupScopedOffering(taskForm.offeringId) &&
+        (!taskForm.groupId || !data.scopedGroups.some((group) => group.id === taskForm.groupId && group.offering_id === taskForm.offeringId && group.is_active))) {
+        throw new Error("أدمن الجروب أو السكشن لازم يختار نطاقه المعيّن له.");
+      }
       const { error } = await supabase.from("tasks").insert({
         offering_id: taskForm.offeringId, course_group_id: taskForm.groupId || null, created_by: currentUserId,
         task_type: taskForm.type, title: taskForm.title.trim(), description: taskForm.description.trim(),
@@ -646,6 +656,13 @@ export default function BeVoApp() {
     setBusy(true);
     try {
       if (!resourceForm.offeringId || !resourceForm.title.trim()) throw new Error("اختر المادة واكتب عنوان المصدر.");
+      if (!manageableOfferings.some((offering) => offering.id === resourceForm.offeringId)) {
+        throw new Error("المادة خارج نطاق الصلاحيات المعيّنة لك.");
+      }
+      if (isGroupScopedOffering(resourceForm.offeringId) &&
+        (!resourceForm.groupId || !data.scopedGroups.some((group) => group.id === resourceForm.groupId && group.offering_id === resourceForm.offeringId && group.is_active))) {
+        throw new Error("أدمن الجروب أو السكشن لازم يختار نطاقه المعيّن له.");
+      }
       if ([resourceForm.driveUrl, resourceForm.youtubeUrl, resourceForm.playlistUrl].some((url) => url && !/^https:\/\//i.test(url))) {
         throw new Error("كل روابط المصادر يجب أن تبدأ بـ HTTPS.");
       }
@@ -772,8 +789,28 @@ export default function BeVoApp() {
     const term = byId(data.terms, offering.term_id);
     return { course, year, level, term };
   }
+  function hasGeneralOfferingManagement(offering: Row) {
+    return isRoot || activeRoleRows.some((role) =>
+      (role.role === "college_admin" && role.college_id === offering.college_id) ||
+      (role.role === "year_admin" && role.college_id === offering.college_id &&
+        role.academic_year_id === offering.academic_year_id && role.study_level_id === offering.study_level_id) ||
+      (role.role === "instructor" && role.college_id === offering.college_id)
+    );
+  }
+  const manageableOfferings = data.offerings.filter((offering) =>
+    offering.is_active && (hasGeneralOfferingManagement(offering) ||
+      data.scopedGroups.some((group) => group.offering_id === offering.id && group.is_active))
+  );
+  function isGroupScopedOffering(offeringId: string) {
+    const offering = byId(data.offerings, offeringId);
+    if (!offering || hasGeneralOfferingManagement(offering)) return false;
+    return data.scopedGroups.some((group) => group.offering_id === offeringId && group.is_active);
+  }
   function getGroupsForOffering(offeringId: string) {
-    return data.groups.filter((group) => group.offering_id === offeringId && group.is_active);
+    return data.groups.filter((group) =>
+      group.offering_id === offeringId && group.is_active &&
+      (!isGroupScopedOffering(offeringId) || data.scopedGroups.some((scope) => scope.id === group.id && scope.is_active))
+    );
   }
   function isMemberOfRole(role: string) { return allRoles.includes(role); }
   function jump(section: Section) {
@@ -982,7 +1019,7 @@ export default function BeVoApp() {
                         </div>
                         {lectures.length === 0 ? <p className="helper-warning"><AlertCircle size={15} /> لم تتم إضافة مواعيد للمحاضرات لهذه المادة بعد.</p> : null}
                       </div>;
-                    })}</div> : <EmptyState title={selectedYearIds.length === 0 ? "لا يوجد عام أكاديمي حالي ومفعّل" : "لم يتم ربط مواد بالكلية والفرقة بعد"} detail={selectedYearIds.length === 0 ? "التسجيل متاح بعد تفعيل عام أكاديمي حالي للكلية." : "ستظهر المواد هنا بعد أن يربطها الأدمن بالعام الأكاديمي والترم."} />}
+                    })}</div> : <EmptyState title={!hasCurrentYearForStudent ? "لا يوجد عام أكاديمي حالي ومفعّل لكليتك" : "لم يتم ربط مواد بالكلية والفرقة بعد"} detail={!hasCurrentYearForStudent ? "التسجيل متاح بعد تفعيل عام أكاديمي حالي للكلية." : "ستظهر المواد هنا بعد أن يربطها الأدمن بالعام الأكاديمي والترم."} />}
                     {studentOfferings.length ? <div className="form-actions"><span className="muted small-text">{Object.values(selectedChoices).filter((choice) => choice.lectureId).length} اختيار محدد</span><button className="btn btn-primary" disabled={busy || (hasRegistration && pendingMyRequest)} onClick={saveRegistration}>{busy ? "جاري الحفظ…" : pendingMyRequest ? "طلبك قيد المراجعة" : hasRegistration ? "إرسال طلب التعديل" : "حفظ التسجيل"} <ArrowLeft size={17} /></button></div> : null}
                     {hasRegistration && selectedChoices && <InputField label="سبب تعديل التسجيل" hint="مطلوب 5 أحرف على الأقل لإرسال طلب التعديل."><textarea rows={2} value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="اكتب سبب طلب التعديل…" /></InputField>}
                     {pendingMyRequest ? <div className="inline-notice"><Clock3 size={16} /> لديك طلب تعديل قيد المراجعة.</div> : null}
@@ -1056,8 +1093,8 @@ export default function BeVoApp() {
           {activeSection === "tasks" ? (
             <div className="stack-lg"><div className="page-heading"><div><span className="eyebrow"><ClipboardList size={14} /> التكليفات</span><h1>المهام والتكليفات</h1><p>تابع المهام المنشورة، أو أضف مهمة داخل النطاق الذي تديره.</p></div></div>
               {isAdmin ? <Panel title="إضافة مهمة" subtitle="المهام لا تظهر للطلاب إلا بعد نشرها." icon={<Plus size={18} />}><form className="form-grid" onSubmit={addTask}>
-                <InputField label="المادة"><select required value={taskForm.offeringId} onChange={(e) => setTaskForm({ ...taskForm, offeringId: e.target.value, groupId: "" })}><option value="">اختر المادة</option>{data.offerings.filter((row) => row.is_active).map((row) => <option key={row.id} value={row.id}>{currentCourseName(row.id)} · {byId(data.years, row.academic_year_id)?.label || ""}</option>)}</select></InputField>
-                <InputField label="الجروب / السكشن (اختياري)"><select value={taskForm.groupId} onChange={(e) => setTaskForm({ ...taskForm, groupId: e.target.value })}><option value="">كل طلاب المادة</option>{getGroupsForOffering(taskForm.offeringId).map((group) => <option key={group.id} value={group.id}>{group.code} · {group.name}</option>)}</select></InputField>
+                <InputField label="المادة"><select required value={taskForm.offeringId} onChange={(e) => setTaskForm({ ...taskForm, offeringId: e.target.value, groupId: "" })}><option value="">اختر المادة</option>{manageableOfferings.map((row) => <option key={row.id} value={row.id}>{currentCourseName(row.id)} · {byId(data.years, row.academic_year_id)?.label || ""}</option>)}</select></InputField>
+                <InputField label={isGroupScopedOffering(taskForm.offeringId) ? "الجروب / السكشن المعيّن لك" : "الجروب / السكشن (اختياري)"}><select required={isGroupScopedOffering(taskForm.offeringId)} value={taskForm.groupId} onChange={(e) => setTaskForm({ ...taskForm, groupId: e.target.value })}>{isGroupScopedOffering(taskForm.offeringId) ? <option value="">اختر نطاقك</option> : <option value="">كل طلاب المادة</option>}{getGroupsForOffering(taskForm.offeringId).map((group) => <option key={group.id} value={group.id}>{group.code} · {group.name}</option>)}</select></InputField>
                 <InputField label="نوع المهمة"><select value={taskForm.type} onChange={(e) => setTaskForm({ ...taskForm, type: e.target.value })}><option value="task">تاسك</option><option value="lecture_task">تاسك محاضرة</option><option value="quiz">كويز</option><option value="assignment">واجب</option><option value="lecture">محاضرة</option></select></InputField>
                 <InputField label="العنوان"><input required value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} /></InputField>
                 <InputField label="آخر موعد"><input type="datetime-local" value={taskForm.dueAt} onChange={(e) => setTaskForm({ ...taskForm, dueAt: e.target.value })} /></InputField>
@@ -1074,8 +1111,8 @@ export default function BeVoApp() {
           {activeSection === "resources" ? (
             <div className="stack-lg"><div className="page-heading"><div><span className="eyebrow"><FileText size={14} /> ملفات الشرح</span><h1>المصادر التعليمية</h1><p>روابط Drive وفيديوهات الشرح وقوائم التشغيل المرتبطة بالمواد أو السكاشن.</p></div></div>
               {isAdmin ? <Panel title="إضافة مصدر تعليمي" subtitle="استخدم روابط HTTPS صالحة فقط." icon={<Plus size={18} />}><form className="form-grid" onSubmit={addResource}>
-                <InputField label="المادة"><select required value={resourceForm.offeringId} onChange={(e) => setResourceForm({ ...resourceForm, offeringId: e.target.value, groupId: "" })}><option value="">اختر المادة</option>{data.offerings.filter((row) => row.is_active).map((row) => <option key={row.id} value={row.id}>{currentCourseName(row.id)}</option>)}</select></InputField>
-                <InputField label="النطاق"><select value={resourceForm.groupId} onChange={(e) => setResourceForm({ ...resourceForm, groupId: e.target.value })}><option value="">كل طلاب المادة</option>{getGroupsForOffering(resourceForm.offeringId).map((group) => <option key={group.id} value={group.id}>{group.code} · {group.name}</option>)}</select></InputField>
+                <InputField label="المادة"><select required value={resourceForm.offeringId} onChange={(e) => setResourceForm({ ...resourceForm, offeringId: e.target.value, groupId: "" })}><option value="">اختر المادة</option>{manageableOfferings.map((row) => <option key={row.id} value={row.id}>{currentCourseName(row.id)}</option>)}</select></InputField>
+                <InputField label={isGroupScopedOffering(resourceForm.offeringId) ? "الجروب / السكشن المعيّن لك" : "النطاق"}><select required={isGroupScopedOffering(resourceForm.offeringId)} value={resourceForm.groupId} onChange={(e) => setResourceForm({ ...resourceForm, groupId: e.target.value })}>{isGroupScopedOffering(resourceForm.offeringId) ? <option value="">اختر نطاقك</option> : <option value="">كل طلاب المادة</option>}{getGroupsForOffering(resourceForm.offeringId).map((group) => <option key={group.id} value={group.id}>{group.code} · {group.name}</option>)}</select></InputField>
                 <InputField label="عنوان المصدر"><input required value={resourceForm.title} onChange={(e) => setResourceForm({ ...resourceForm, title: e.target.value })} /></InputField>
                 <InputField label="وصف مختصر"><input value={resourceForm.description} onChange={(e) => setResourceForm({ ...resourceForm, description: e.target.value })} /></InputField>
                 <InputField label="رابط ملف Drive"><input type="url" placeholder="https://drive.google.com/…" value={resourceForm.driveUrl} onChange={(e) => setResourceForm({ ...resourceForm, driveUrl: e.target.value })} /></InputField>
