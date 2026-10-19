@@ -339,3 +339,60 @@ body.site-content-edit-mode [data-site-editor-hover="true"]{outline:2px dashed #
 .site-editor-actions .btn{font-size:10px}
 .site-editor-message{margin-top:9px;color:#397b60;font-size:10px;line-height:1.8;overflow-wrap:anywhere}
 @media(max-width:560px){.site-content-editor-controls{right:12px;bottom:70px;max-width:calc(100vw - 24px)}.site-editor-trigger{min-height:40px;padding:10px 13px}.site-editor-modal{padding:17px;border-radius:16px}.site-editor-modal h2{font-size:17px}.site-editor-actions{gap:6px}.site-editor-actions .btn{padding:9px 10px}}
+
+
+/* In-page academic catalog management */
+.catalog-manager-panel{overflow:visible}
+.catalog-manager-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.catalog-manager-tab{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:8px 11px;border:1px solid #dce5ef;border-radius:11px;background:#fff;color:#42546d;font-size:11px;font-weight:800;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.catalog-manager-tab:hover{border-color:#98b5d9;background:#f7faff}
+.catalog-manager-tab-active{border-color:#294d78;background:#edf4fd;color:#193c68}
+.catalog-manager-tab b{min-width:20px;padding:2px 5px;border-radius:7px;background:#e8eef6;color:#49617e;font-size:10px;text-align:center}
+.catalog-manager-search{display:flex;align-items:center;gap:9px;max-width:500px;min-height:41px;margin:0 0 14px;padding:0 12px;border:1px solid #dce5ef;border-radius:11px;background:#fbfcfe;color:#75879e}
+.catalog-manager-search input{width:100%;min-width:0;border:0!important;outline:none!important;box-shadow:none!important;background:transparent!important;color:#203653;font-size:12px}
+.catalog-entity-list{display:grid;gap:8px}
+.catalog-entity-row{position:relative;display:flex;align-items:center;justify-content:space-between;gap:13px;min-width:0;padding:12px 13px;border:1px solid #e4ebf3;border-radius:12px;background:#fff}
+.catalog-entity-row-inactive{background:#f7f8fa;border-style:dashed}
+.catalog-entity-copy{display:grid;gap:4px;min-width:0}
+.catalog-entity-copy strong{color:#243b57;font-size:12px;font-weight:800;overflow-wrap:anywhere}
+.catalog-entity-copy small{color:#75869b;font-size:10px;line-height:1.8;overflow-wrap:anywhere}
+.catalog-entity-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.catalog-state{display:inline-flex;align-items:center;justify-content:center;min-width:43px;padding:4px 7px;border-radius:7px;background:#e8f5ee;color:#287451;font-size:9px;font-weight:800}
+.catalog-state-off{background:#eef0f3;color:#6e7a89}
+.catalog-menu-position{position:relative}
+.catalog-menu-trigger{width:36px;height:36px;min-width:36px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #dfe7f0;border-radius:10px;background:#fff;color:#435b79}
+.catalog-menu-trigger:hover{background:#f0f5fc;border-color:#b8cce5}
+.catalog-entity-menu{position:absolute;top:calc(100% + 5px);left:0;z-index:80;display:grid;gap:3px;min-width:150px;padding:5px;border:1px solid #dce5ef;border-radius:12px;background:#fff;box-shadow:0 12px 35px rgba(24,49,80,.17)}
+.catalog-entity-menu button{display:flex;align-items:center;gap:8px;width:100%;min-height:37px;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:#294260;font-size:11px;font-weight:700;text-align:right;cursor:pointer}
+.catalog-entity-menu button:hover{background:#f1f5fa}
+.catalog-entity-menu .catalog-delete-action{color:#a63e4b}
+.catalog-entity-menu .catalog-delete-action:hover{background:#fff1f2}
+.catalog-entity-menu .catalog-restore-action{color:#277452}
+.catalog-manager-empty{padding:24px 12px;border:1px dashed #d5e0ec;border-radius:12px;color:#78889d;font-size:12px;text-align:center}
+.catalog-manager-note{margin:12px 0 0;color:#75869b;font-size:10px;line-height:1.9}
+.catalog-editor-backdrop{position:fixed;inset:0;z-index:10005;display:grid;place-items:center;padding:16px;background:rgba(12,27,47,.54);backdrop-filter:blur(4px);direction:rtl}
+.catalog-editor-modal{width:min(620px,100%);max-height:min(90vh,780px);overflow:auto;padding:22px;border:1px solid #dfe7f1;border-radius:20px;background:#fff;color:#213752;box-shadow:0 25px 85px rgba(9,25,47,.32)}
+.catalog-editor-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:17px}
+.catalog-editor-heading h2{margin:4px 0 0;color:#203653;font-size:18px;font-weight:800;overflow-wrap:anywhere}
+.catalog-editor-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.catalog-editor-form .field{min-width:0}
+.catalog-editor-form .field input,.catalog-editor-form .field select{width:100%;min-width:0}
+.catalog-editor-time-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.catalog-editor-check{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:13px;border:1px solid #dfe8f2;border-radius:12px;background:#f8fbff;color:#2d4562}
+.catalog-editor-check input{width:17px;height:17px;accent-color:#285487}
+.catalog-editor-check span{display:grid;gap:4px}
+.catalog-editor-check strong{font-size:12px}
+.catalog-editor-check small{color:#7a8ba0;font-size:10px}
+.catalog-editor-actions{grid-column:1/-1;display:flex;justify-content:flex-start;gap:9px;flex-wrap:wrap;margin-top:5px}
+@media(max-width:620px){
+  .catalog-manager-tabs{gap:6px}
+  .catalog-manager-tab{flex:1 1 calc(50% - 6px);justify-content:flex-start;padding:8px}
+  .catalog-entity-row{align-items:flex-start;padding:10px;gap:9px}
+  .catalog-entity-controls{gap:5px}
+  .catalog-state{min-width:35px;padding:4px 5px}
+  .catalog-menu-trigger{width:33px;height:33px;min-width:33px}
+  .catalog-editor-modal{padding:16px;border-radius:16px}
+  .catalog-editor-form{grid-template-columns:minmax(0,1fr)}
+  .catalog-editor-time-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .catalog-editor-actions{grid-column:auto}
+}
