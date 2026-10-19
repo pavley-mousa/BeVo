@@ -510,9 +510,20 @@ export default function BeVoApp() {
         study_level_id: offeringForm.levelId, term_id: offeringForm.termId,
         requires_section: offeringForm.requiresSection, is_active: true,
       };
-      const { error } = await supabase.from("course_offerings")
-        .upsert(row, { onConflict: "course_id,academic_year_id,study_level_id,term_id" });
-      if (error) throw error;
+      if (isYearAdmin && !isRoot && !isCollegeAdmin) {
+        const { error } = await supabase.rpc("year_admin_create_offering", {
+          p_course_id: course.id,
+          p_academic_year_id: offeringForm.yearId,
+          p_study_level_id: offeringForm.levelId,
+          p_term_id: offeringForm.termId,
+          p_requires_section: offeringForm.requiresSection,
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("course_offerings")
+          .upsert(row, { onConflict: "course_id,academic_year_id,study_level_id,term_id" });
+        if (error) throw error;
+      }
       notify("تم ربط المادة بالعام والفرقة والترم."); refresh();
     } catch (error) { notify(messageOf(error), "error"); }
     finally { setBusy(false); }
@@ -559,6 +570,16 @@ export default function BeVoApp() {
     setBusy(true);
     try {
       if (!generalRoleForm.userId) throw new Error("اختر الحساب.");
+      if (generalRoleForm.role === "year_admin") {
+        const selectedYear = byId(data.years, generalRoleForm.yearId);
+        const selectedLevel = byId(data.levels, generalRoleForm.levelId);
+        if (!generalRoleForm.collegeId || !generalRoleForm.yearId || !generalRoleForm.levelId) {
+          throw new Error("دور أدمن السنة يحتاج تحديد الكلية والسنة والفرقة.");
+        }
+        if (selectedYear?.college_id !== generalRoleForm.collegeId || selectedLevel?.college_id !== generalRoleForm.collegeId) {
+          throw new Error("السنة والفرقة يجب أن يتبعا الكلية المختارة.");
+        }
+      }
       const { error } = await supabase.from("role_assignments").insert({
         user_id: generalRoleForm.userId, role: generalRoleForm.role,
         college_id: generalRoleForm.collegeId || null, academic_year_id: generalRoleForm.yearId || null,
@@ -931,6 +952,7 @@ export default function BeVoApp() {
 
           {activeSection === "admin" ? <AcademicAdmin
             data={data} currentUserId={currentUserId} isRoot={isRoot} isCollegeAdmin={isCollegeAdmin}
+            isYearAdmin={isYearAdmin && !isRoot && !isCollegeAdmin}
             busy={busy} collegeForm={collegeForm} setCollegeForm={setCollegeForm} yearForm={yearForm} setYearForm={setYearForm}
             levelForm={levelForm} setLevelForm={setLevelForm} termForm={termForm} setTermForm={setTermForm}
             courseForm={courseForm} setCourseForm={setCourseForm} offeringForm={offeringForm} setOfferingForm={setOfferingForm}
@@ -1039,9 +1061,9 @@ export default function BeVoApp() {
               {isRoot ? <Panel title="إسناد دور إداري عام" subtitle="تعيين الأدوار العامة متاح لمدير المنصة فقط؛ الجروبات والسكاشن لها تعيين منفصل." icon={<UserCog size={18} />}><form className="form-grid" onSubmit={assignGeneralRole}>
                 <InputField label="المستخدم"><select required value={generalRoleForm.userId} onChange={(e) => setGeneralRoleForm({ ...generalRoleForm, userId: e.target.value })}><option value="">اختر الحساب</option>{data.profiles.map((row) => <option key={row.id} value={row.id}>{fullName(row)} · {row.email || row.student_id || row.id.slice(0, 8)}</option>)}</select></InputField>
                 <InputField label="الدور"><select value={generalRoleForm.role} onChange={(e) => setGeneralRoleForm({ ...generalRoleForm, role: e.target.value })}><option value="college_admin">أدمن الكلية</option><option value="year_admin">أدمن السنة</option><option value="instructor">دكتور / معيد</option></select></InputField>
-                <InputField label="الكلية"><select value={generalRoleForm.collegeId} onChange={(e) => setGeneralRoleForm({ ...generalRoleForm, collegeId: e.target.value })}><option value="">كل الكليات (عند السماح)</option>{data.colleges.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></InputField>
-                <InputField label="العام"><select value={generalRoleForm.yearId} onChange={(e) => setGeneralRoleForm({ ...generalRoleForm, yearId: e.target.value })}><option value="">اختر العام (اختياري)</option>{data.years.filter((row) => !generalRoleForm.collegeId || row.college_id === generalRoleForm.collegeId).map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></InputField>
-                <InputField label="الفرقة"><select value={generalRoleForm.levelId} onChange={(e) => setGeneralRoleForm({ ...generalRoleForm, levelId: e.target.value })}><option value="">اختر الفرقة (اختياري)</option>{data.levels.filter((row) => !generalRoleForm.collegeId || row.college_id === generalRoleForm.collegeId).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></InputField>
+                <InputField label="الكلية"><select required={generalRoleForm.role === "year_admin"} value={generalRoleForm.collegeId} onChange={(e) => setGeneralRoleForm({ ...generalRoleForm, collegeId: e.target.value, yearId: "", levelId: "" })}><option value="">كل الكليات (عند السماح)</option>{data.colleges.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></InputField>
+                <InputField label="العام"><select required={generalRoleForm.role === "year_admin"} value={generalRoleForm.yearId} onChange={(e) => setGeneralRoleForm({ ...generalRoleForm, yearId: e.target.value })}><option value="">اختر العام {generalRoleForm.role === "year_admin" ? "(مطلوب)" : "(اختياري)"}</option>{data.years.filter((row) => row.is_active && (!generalRoleForm.collegeId || row.college_id === generalRoleForm.collegeId)).map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></InputField>
+                <InputField label="الفرقة"><select required={generalRoleForm.role === "year_admin"} value={generalRoleForm.levelId} onChange={(e) => setGeneralRoleForm({ ...generalRoleForm, levelId: e.target.value })}><option value="">اختر الفرقة {generalRoleForm.role === "year_admin" ? "(مطلوب)" : "(اختياري)"}</option>{data.levels.filter((row) => row.is_active && (!generalRoleForm.collegeId || row.college_id === generalRoleForm.collegeId)).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></InputField>
                 <div className="form-submit"><button className="btn btn-primary" disabled={busy} type="submit">إسناد الدور <Plus size={16} /></button></div>
               </form></Panel> : null}
             </div>
@@ -1152,12 +1174,140 @@ function CollegeCreateForm({ onCreated }: { onCreated: () => void }) {
   return <form className="inline-form" onSubmit={submit}><InputField label="اسم الكلية"><input required value={name} onChange={(e) => setName(e.target.value)} placeholder="كلية الحاسبات والمعلومات" /></InputField><InputField label="كود الكلية"><input required value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS" /></InputField><button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "جاري الحفظ…" : "إضافة الكلية"} <Plus size={16} /></button>{message ? <span className="form-message">{message}</span> : null}</form>;
 }
 
-function AcademicAdmin({ data, currentUserId, isRoot, isCollegeAdmin, busy, collegeForm, setCollegeForm, yearForm, setYearForm,
+function YearAdminWorkspace({ data, currentUserId, refresh, notify }: {
+  data: WorkspaceData; currentUserId: string; refresh: () => void;
+  notify: (text: string, tone?: "success" | "error" | "info") => void;
+}) {
+  const scopes = data.roles.filter((row) =>
+    row.user_id === currentUserId && row.role === "year_admin" && row.is_active &&
+    row.college_id && row.academic_year_id && row.study_level_id
+  );
+  const scopeKey = (row: Row) => `${row.college_id}:${row.academic_year_id}:${row.study_level_id}`;
+  const scopeOptions = Array.from(new Map(scopes.map((row) => [scopeKey(row), row])).values());
+  const [selectedScopeKey, setSelectedScopeKey] = useState("");
+  const scope = scopeOptions.find((row) => scopeKey(row) === selectedScopeKey) || scopeOptions[0];
+  const [courseId, setCourseId] = useState("");
+  const [termId, setTermId] = useState("");
+  const [requiresSection, setRequiresSection] = useState(true);
+  const [lectureForm, setLectureForm] = useState({
+    offeringId: "", label: "المحاضرة A", day: "0", start: "09:00", end: "10:30",
+    instructorName: "", room: "", capacity: "100",
+  });
+  const [busy, setBusy] = useState(false);
+  const scopedOfferings = data.offerings.filter((row) =>
+    row.is_active && scope &&
+    row.college_id === scope.college_id &&
+    row.academic_year_id === scope.academic_year_id &&
+    row.study_level_id === scope.study_level_id
+  );
+  async function createOffering(event: FormEvent) {
+    event.preventDefault();
+    if (!scope || !courseId || !termId) {
+      notify("اختر نطاق السنة والفرقة والمادة والترم.", "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase.rpc("year_admin_create_offering", {
+        p_course_id: courseId,
+        p_academic_year_id: scope.academic_year_id,
+        p_study_level_id: scope.study_level_id,
+        p_term_id: termId,
+        p_requires_section: requiresSection,
+      });
+      if (error) throw error;
+      setCourseId("");
+      setTermId("");
+      notify("تم ربط المادة بالنطاق الأكاديمي المعيّن لك.");
+      refresh();
+    } catch (error) {
+      notify(messageOf(error), "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function createLecture(event: FormEvent) {
+    event.preventDefault();
+    const offering = byId(scopedOfferings, lectureForm.offeringId);
+    if (!offering || !lectureForm.label.trim()) {
+      notify("اختر مادة داخل نطاقك واكتب اسم المحاضرة.", "error");
+      return;
+    }
+    if (lectureForm.end <= lectureForm.start) {
+      notify("وقت النهاية لازم يكون بعد وقت البداية.", "error");
+      return;
+    }
+    if (data.lectures.filter((row) => row.offering_id === offering.id).length >= 4) {
+      notify("الحد الأقصى 4 اختيارات محاضرة لكل مادة.", "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("lecture_options").insert({
+        offering_id: offering.id,
+        label: lectureForm.label.trim(),
+        day_of_week: Number(lectureForm.day),
+        starts_at: lectureForm.start,
+        ends_at: lectureForm.end,
+        instructor_name: lectureForm.instructorName.trim() || null,
+        room: lectureForm.room.trim() || null,
+        capacity: lectureForm.capacity ? Number(lectureForm.capacity) : null,
+        is_active: true,
+      });
+      if (error) throw error;
+      setLectureForm({ ...lectureForm, label: "", instructorName: "", room: "", capacity: "" });
+      notify("تمت إضافة اختيار المحاضرة.");
+      refresh();
+    } catch (error) {
+      notify(messageOf(error), "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!scopeOptions.length) {
+    return <div className="stack-lg">
+      <div className="page-heading"><div><span className="eyebrow"><ShieldCheck size={14} /> صلاحيات أدمن السنة</span><h1>الإدارة الأكاديمية</h1><p>صلاحيتك مرتبطة بكلية وسنة وفرقة محددة.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
+      <EmptyState title="لا يوجد نطاق سنة مكتمل للحساب" detail="اطلب من مدير المنصة إعادة تعيين دور أدمن السنة مع تحديد الكلية والسنة والفرقة." />
+    </div>;
+  }
+  return <div className="stack-lg">
+    <div className="page-heading"><div><span className="eyebrow"><ShieldCheck size={14} /> صلاحيات أدمن السنة</span><h1>إدارة مواد السنة والفرقة</h1><p>تقدر تربط المواد الموجودة وتضيف اختيارات المحاضرات داخل النطاق المعيّن لك فقط.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
+    {scopeOptions.length > 1 ? <Panel title="النطاق الإداري" subtitle="اختر واحدة من السنوات والفرق المسندة إلى حسابك." icon={<Layers size={18} />}>
+      <InputField label="الكلية · العام · الفرقة"><select value={scopeKey(scope)} onChange={(e) => setSelectedScopeKey(e.target.value)}>{scopeOptions.map((row) => <option key={scopeKey(row)} value={scopeKey(row)}>{byId(data.colleges,row.college_id)?.name || "كلية"} · {byId(data.years,row.academic_year_id)?.label || "سنة"} · {byId(data.levels,row.study_level_id)?.name || "فرقة"}</option>)}</select></InputField>
+    </Panel> : null}
+    <Panel title="ربط مادة بالنطاق" subtitle="يمكنك ربط مادة نشطة من كليتك بالسنة والترم المعيّنين لك." icon={<Plus size={18} />}>
+      <form className="form-grid" onSubmit={createOffering}>
+        <InputField label="المادة"><select required value={courseId} onChange={(e) => setCourseId(e.target.value)}><option value="">اختر المادة</option>{data.courses.filter((row) => row.is_active && row.college_id === scope.college_id).map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name}</option>)}</select></InputField>
+        <InputField label="الترم"><select required value={termId} onChange={(e) => setTermId(e.target.value)}><option value="">اختر الترم</option>{data.terms.filter((row) => row.is_active && row.academic_year_id === scope.academic_year_id).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></InputField>
+        <label className="check-line"><input type="checkbox" checked={requiresSection} onChange={(e) => setRequiresSection(e.target.checked)} /> المادة تتطلب سكشن / جروب</label>
+        <div className="form-submit"><button className="btn btn-primary" type="submit" disabled={busy}>{busy ? "جاري الحفظ…" : "حفظ ربط المادة"} <Plus size={16} /></button></div>
+      </form>
+    </Panel>
+    <Panel title="اختيارات المحاضرات" subtitle="أضف مواعيد محاضرات للمواد التي تديرها." icon={<CalendarDays size={18} />}>
+      <form className="form-grid" onSubmit={createLecture}>
+        <InputField label="المادة"><select required value={lectureForm.offeringId} onChange={(e) => setLectureForm({ ...lectureForm, offeringId: e.target.value })}><option value="">اختر المادة</option>{scopedOfferings.map((row) => <option key={row.id} value={row.id}>{currentCourseNameFrom(data,row.id)} · {byId(data.terms,row.term_id)?.name || "ترم"}</option>)}</select></InputField>
+        <InputField label="اسم اختيار المحاضرة"><input required value={lectureForm.label} onChange={(e) => setLectureForm({ ...lectureForm, label: e.target.value })} /></InputField>
+        <InputField label="اليوم"><select value={lectureForm.day} onChange={(e) => setLectureForm({ ...lectureForm, day: e.target.value })}>{DAYS.map((day,index) => <option key={day} value={index}>{day}</option>)}</select></InputField>
+        <InputField label="من"><input type="time" required value={lectureForm.start} onChange={(e) => setLectureForm({ ...lectureForm, start: e.target.value })} /></InputField>
+        <InputField label="إلى"><input type="time" required value={lectureForm.end} onChange={(e) => setLectureForm({ ...lectureForm, end: e.target.value })} /></InputField>
+        <InputField label="اسم الدكتور / المعيد"><input value={lectureForm.instructorName} onChange={(e) => setLectureForm({ ...lectureForm, instructorName: e.target.value })} /></InputField>
+        <InputField label="القاعة / المعمل"><input value={lectureForm.room} onChange={(e) => setLectureForm({ ...lectureForm, room: e.target.value })} /></InputField>
+        <InputField label="السعة"><input type="number" min="1" value={lectureForm.capacity} onChange={(e) => setLectureForm({ ...lectureForm, capacity: e.target.value })} /></InputField>
+        <div className="form-submit"><button className="btn btn-primary" type="submit" disabled={busy}>{busy ? "جاري الحفظ…" : "إضافة المحاضرة"} <Plus size={16} /></button></div>
+      </form>
+    </Panel>
+    <Panel title="ملخص النطاق" subtitle="عدادات محدودة بالسنة والفرقة المختارتين." icon={<Activity size={18} />}>
+      <div className="summary-strip"><div><small>المواد المرتبطة</small><strong>{scopedOfferings.length}</strong></div><div><small>اختيارات المحاضرات</small><strong>{data.lectures.filter((row) => scopedOfferings.some((offering) => offering.id === row.offering_id)).length}</strong></div><div><small>الجروبات والسكاشن</small><strong>{data.groups.filter((row) => scopedOfferings.some((offering) => offering.id === row.offering_id)).length}</strong></div></div>
+    </Panel>
+  </div>;
+}
+
+function AcademicAdmin({ data, currentUserId, isRoot, isCollegeAdmin, isYearAdmin, busy, collegeForm, setCollegeForm, yearForm, setYearForm,
   levelForm, setLevelForm, termForm, setTermForm, courseForm, setCourseForm, offeringForm, setOfferingForm,
   lectureForm, setLectureForm, defaultForm, setDefaultForm, addCollege, addAcademicYear, addLevel, addTerm,
   addCourse, addOffering, addLecture, assignDefault, refresh, notify,
 }: {
-  data: WorkspaceData; currentUserId: string; isRoot: boolean; isCollegeAdmin: boolean; busy: boolean;
+  data: WorkspaceData; currentUserId: string; isRoot: boolean; isCollegeAdmin: boolean; isYearAdmin: boolean; busy: boolean;
   collegeForm: { name: string; code: string }; setCollegeForm: (value: { name: string; code: string }) => void;
   yearForm: { collegeId: string; label: string; startsOn: string; endsOn: string; current: boolean }; setYearForm: (value: typeof yearForm) => void;
   levelForm: { collegeId: string; name: string; sortOrder: string }; setLevelForm: (value: typeof levelForm) => void;
@@ -1172,6 +1322,9 @@ function AcademicAdmin({ data, currentUserId, isRoot, isCollegeAdmin, busy, coll
   notify: (text: string, tone?: "success" | "error" | "info") => void;
 }) {
   const [openPanel, setOpenPanel] = useState("structure");
+  if (isYearAdmin && !isRoot && !isCollegeAdmin) {
+    return <YearAdminWorkspace data={data} currentUserId={currentUserId} refresh={refresh} notify={notify} />;
+  }
   return <div className="stack-lg">
     <div className="page-heading"><div><span className="eyebrow"><ShieldCheck size={14} /> إدارة المنظومة الأكاديمية</span><h1>إدارة الكليات والسنوات والمواد</h1><p>الإجراءات المتاحة تعتمد على الدور والنطاق المعيّن لحسابك.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
     {isRoot ? <Panel title="إضافة كلية" subtitle="تبدأ المنظومة بالكلية، ثم العام الأكاديمي والفرق والمواد." icon={<Plus size={18} />}><form className="form-grid" onSubmit={addCollege}><InputField label="اسم الكلية"><input required value={collegeForm.name} onChange={(e) => setCollegeForm({ ...collegeForm, name: e.target.value })} /></InputField><InputField label="كود الكلية"><input required value={collegeForm.code} onChange={(e) => setCollegeForm({ ...collegeForm, code: e.target.value })} /></InputField><div className="form-submit"><button className="btn btn-primary" disabled={busy} type="submit">إضافة الكلية <Plus size={16} /></button></div></form></Panel> : null}
