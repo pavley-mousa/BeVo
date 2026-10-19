@@ -1,9 +1,23 @@
-export default function RecoveryFallback() {
-  return (
-    <main lang="ar" dir="rtl" style={{ padding: 24, fontFamily: "Tahoma, Arial, sans-serif" }}>
-      <h1>BeVo | البوابة الأكاديمية</h1>
-      <p>يتم فتح نسخة الاستعادة من الواجهة.</p>
-      <a href="/legacy.html">فتح واجهة BeVo المستعادة</a>
-    </main>
-  );
+"use client";
+
+import { useEffect, useState } from "react";
+import BeVoApp from "@/components/BeVoApp";
+
+export default function HomePage() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => setReady(true), []);
+
+  if (!ready) {
+    return (
+      <main className="boot-screen" dir="rtl" lang="ar">
+        <div className="boot-mark">B</div>
+        <div className="boot-spinner" />
+        <strong>جاري تجهيز BeVo…</strong>
+        <span>المنصة الأكاديمية</span>
+      </main>
+    );
+  }
+
+  return <BeVoApp />;
 }

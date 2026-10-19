@@ -1,18 +1,21 @@
-# BeVo — recovered runtime branch
+# BeVo — React + TypeScript
 
-The original editable application files were not present in GitHub. This branch restores a buildable Next.js project around the most recent available production HTML.
+BeVo is the academic portal for students and authorized staff. The editable application source is in `src/src/app` and `src/src/components`; it is a Next.js App Router app written in React and TypeScript.
 
-## Recovery approach
+## Included in this rebuild
+- Supabase email/password authentication, email OTP verification, password recovery, and Google OAuth.
+- Student academic profile completion and course registration/change-request flows.
+- Academic administration for colleges, years, levels, terms, courses, course offerings and lectures.
+- Group/section scoped administration for A–D and a1–d6 using the existing Supabase RPCs and row-level security.
+- Tasks, educational links/resources, requests, in-app notifications and an interactive onboarding guide.
+- Responsive RTL Arabic layout.
 
-- `src/public/legacy.html` preserves the rendered HTML captured from the last known-good BeVo production deployment.
-- `src/next.config.ts` keeps the browser runtime working by proxying versioned Next.js static assets to the immutable deployment URL: https://bevo-tasker-pr5cq1qsg-bavlymosa37-4178.vercel.app
-- `src/public/icon.svg`, `manifest.webmanifest`, and `sw.js` were also recovered from the deployment.
-- The project is kept on `recovery-live-runtime` so it can be tested as a preview before changing the production branch.
+## Local development
+1. Copy `src/.env.example` to `src/.env.local`.
+2. Add the Supabase URL and public publishable/anon key used by the project.
+3. Run `cd src && npm install && npm run dev`.
 
-## Limitation
+Never put a Supabase service-role key in browser code. Permissions are enforced by the existing database policies and RPCs.
 
-This is a **runtime recovery bridge**, not the original editable React/TypeScript components. The compiled runtime remains hosted on the pinned Vercel deployment. Do not delete that deployment until the frontend is fully rebuilt into source components and verified.
-
-## Next restoration work
-
-Reconstruct editable pages/components from the recovered running behavior, replace the HTML rewrite with real App Router routes, then remove the external static-asset rewrite. Keep Supabase service-role secrets out of all browser-side files.
+## Deployment notes
+The Vercel project root is `src`. The production alias was intentionally not switched during this rebuild; preview deployments should be tested before promoting new code. The earlier compiled runtime snapshot is not used by this React/TypeScript application.
