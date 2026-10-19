@@ -103,6 +103,7 @@ export default function BeVoApp() {
   });
   const [profileDraft, setProfileDraft] = useState({ first: "", middle: "", third: "", studentId: "", collegeId: "", levelId: "", year: "" });
   const [claimToken, setClaimToken] = useState("");
+  const [skipProfileSetup, setSkipProfileSetup] = useState(false);
   const [selectedChoices, setSelectedChoices] = useState<Record<string, { lectureId: string; groupId: string }>>({});
   const [changeReason, setChangeReason] = useState("");
 
@@ -149,9 +150,26 @@ export default function BeVoApp() {
 
   useEffect(() => {
     if (!session?.user?.id) {
-      setData(EMPTY_DATA);
       setProfile(null);
-      return;
+      let catalogLive = true;
+      const loadPublicCatalog = async () => {
+        const [collegesResult, levelsResult, yearsResult, termsResult] = await Promise.all([
+          supabase.from("colleges").select("*").eq("is_active", true),
+          supabase.from("study_levels").select("*").eq("is_active", true),
+          supabase.from("academic_years").select("*").eq("is_active", true),
+          supabase.from("terms").select("*").eq("is_active", true),
+        ]);
+        if (!catalogLive) return;
+        setData({
+          ...EMPTY_DATA,
+          colleges: (collegesResult.data || []) as Row[],
+          levels: (levelsResult.data || []) as Row[],
+          years: (yearsResult.data || []) as Row[],
+          terms: (termsResult.data || []) as Row[],
+        });
+      };
+      void loadPublicCatalog();
+      return () => { catalogLive = false; };
     }
     let live = true;
     const load = async () => {
@@ -784,7 +802,7 @@ export default function BeVoApp() {
     );
   }
 
-  if (profile && !profile.college_id && !isRoot) {
+  if (profile && !profile.college_id && !isRoot && !skipProfileSetup) {
     return (
       <main className="profile-setup-page" dir="rtl" lang="ar">
         <div className="brand-lockup dark"><span className="brand-mark">B</span><div><strong>BeVo</strong><small>إكمال البيانات الأكاديمية</small></div></div>
@@ -803,7 +821,10 @@ export default function BeVoApp() {
           </div>
           <InputField label="سنة الالتحاق"><input value={profileDraft.year} onChange={(e) => setProfileDraft({ ...profileDraft, year: e.target.value })} /></InputField>
           <button className="btn btn-primary btn-wide" disabled={busy} type="submit">{busy ? "جاري الحفظ…" : "حفظ البيانات"} <Check size={17} /></button>
-          <button type="button" className="text-button setup-logout" onClick={signOut}>تسجيل الخروج</button>
+          <div className="setup-extra-actions">
+            <button type="button" className="text-button" onClick={() => setSkipProfileSetup(true)}>أنا مدير المنصة الأول — تفعيل Super Admin</button>
+            <button type="button" className="text-button setup-logout" onClick={signOut}>تسجيل الخروج</button>
+          </div>
         </form>
         {notice ? <div className={`toast toast-${notice.tone}`} role="status">{notice.text}</div> : null}
       </main>
@@ -1030,7 +1051,7 @@ export default function BeVoApp() {
         </main>
         <footer className="app-footer"><span>BeVo · البوابة الأكاديمية</span><span>البيانات والصلاحيات تُراجع من قاعدة البيانات</span><button className="text-button" onClick={() => { setGuideStep(0); setGuideOpen(true); }}>مساعد <CircleHelp size={14} /></button></footer>
       </div>
-      {guideOpen ? <GuideDialog step={guideStep} setStep={setGuideStep} close={() => setGuideOpen(false)} onNavigate={jump} /> : null}
+      {guideOpen ? <GuideDialog step={guideStep} setStep={setGuideStep} close={() => setGuideOpen(false)} onNavigate={jump} allowedSections={navItems.map((item) => item.id)} /> : null}
       {notice ? <div className={`toast toast-${notice.tone}`} role="status"><span>{notice.tone === "error" ? <AlertCircle size={17} /> : <CheckCircle2 size={17} />}</span>{notice.text}<button onClick={() => setNotice(null)} aria-label="إغلاق"><X size={15} /></button></div> : null}
     </div>
   );
@@ -1076,7 +1097,7 @@ function AdminCourseCatalog({ data, isRoot, isCollegeAdmin, busy, notify, refres
   }
   return <div className="stack-lg">
     <div className="page-heading"><div><span className="eyebrow"><Settings size={14} /> صلاحيات الإدارة</span><h1>الإدارة الأكاديمية</h1><p>أضف الكليات والأعوام والفرق والمواد، ثم اربط المواد بالترم والمواعيد.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
-    {isRoot ? <Panel title="إضافة كلية" subtitle="الكليات النشطة تظهر في تسجيل الحسابات." icon={<Plus size={18} />}><CollegeCreateForm /></Panel> : null}
+    {isRoot ? <Panel title="إضافة كلية" subtitle="الكليات النشطة تظهر في تسجيل الحسابات." icon={<Plus size={18} />}><CollegeCreateForm onCreated={refresh} /></Panel> : null}
     <Panel title="ربط مادة بعام وفرقة وترم" subtitle="يحدد الربط أين تظهر المادة للطلاب، واختيار السكشن مطلوب عند تفعيله." icon={<BookOpen size={18} />}>
       <form className="form-grid" onSubmit={createOffering}>
         <InputField label="الكلية / المادة"><select required value={courseId} onChange={(e) => { setCourseId(e.target.value); setYearId(""); setLevelId(""); }}><option value="">اختر المادة</option>{data.courses.filter((row) => row.is_active).map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name}</option>)}</select></InputField>
@@ -1109,7 +1130,7 @@ function currentCourseNameFrom(data: WorkspaceData, offeringId: string) {
   return byId(data.courses, offering?.course_id)?.name || "مادة";
 }
 
-function CollegeCreateForm() {
+function CollegeCreateForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1117,7 +1138,7 @@ function CollegeCreateForm() {
   async function submit(event: FormEvent) {
     event.preventDefault(); setLoading(true); setMessage("");
     const { error } = await supabase.from("colleges").insert({ name: name.trim(), code: code.trim().toUpperCase(), is_active: true });
-    if (error) setMessage(error.message); else { setName(""); setCode(""); setMessage("تمت إضافة الكلية. حدّث الصفحة لعرضها."); }
+    if (error) setMessage(error.message); else { setName(""); setCode(""); setMessage("تمت إضافة الكلية."); onCreated(); }
     setLoading(false);
   }
   return <form className="inline-form" onSubmit={submit}><InputField label="اسم الكلية"><input required value={name} onChange={(e) => setName(e.target.value)} placeholder="كلية الحاسبات والمعلومات" /></InputField><InputField label="كود الكلية"><input required value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS" /></InputField><button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "جاري الحفظ…" : "إضافة الكلية"} <Plus size={16} /></button>{message ? <span className="form-message">{message}</span> : null}</form>;
@@ -1217,7 +1238,7 @@ function AcademicAdmin({ data, currentUserId, isRoot, isCollegeAdmin, busy, coll
   </div>;
 }
 
-function GuideDialog({ step, setStep, close, onNavigate }: { step: number; setStep: (value: number) => void; close: () => void; onNavigate: (section: Section) => void }) {
+function GuideDialog({ step, setStep, close, onNavigate, allowedSections }: { step: number; setStep: (value: number) => void; close: () => void; onNavigate: (section: Section) => void; allowedSections: Section[] }) {
   const guide = [
     { title: "مرحبًا بك في BeVo", body: "دي جولتك التعريفية. هنستعرض سوا أهم أجزاء المنصة: التنقل، المواد والمحاضرات، مساحة العمل، الإشعارات، والصلاحيات.", target: "overview" as Section, icon: <Home size={25} /> },
     { title: "الصفحة الرئيسية", body: "ابدأ من الرئيسية لمتابعة بياناتك، واستخدم قائمة التنقل الجانبية للانتقال بين الأقسام المتاحة لحسابك.", target: "overview" as Section, icon: <Activity size={25} /> },
@@ -1225,12 +1246,13 @@ function GuideDialog({ step, setStep, close, onNavigate }: { step: number; setSt
     { title: "مساحة العمل والتكليفات", body: "استخدم مساحة العمل لمراجعة التاسكات والتكليفات والأنشطة المرتبطة بالدراسة، وافتح كل عنصر لمعرفة تفاصيله ومواعيده.", target: "tasks" as Section, icon: <ClipboardList size={25} /> },
     { title: "الإشعارات وطلبات التغيير", body: "الإشعارات تعرض المستجدات المتاحة لحسابك، وطلبات التغيير تتيح متابعة الطلبات والإجراءات من مكان واحد.", target: "notifications" as Section, icon: <Bell size={25} /> },
     { title: "إدارة الجروب / السكشن", body: "لو أنت أدمن جروب أو سكشن، افتح قسم الإدارة لتحديث اسم المعيد والميعاد والقاعة والسعة. التغيير محصور في نطاقك المعتمد.", target: "scope" as Section, icon: <Layers size={25} /> },
-  ];
-  const current = guide[step];
+  ].filter((item, index) => index === 0 || allowedSections.includes(item.target));
+  const safeStep = Math.min(step, guide.length - 1);
+  const current = guide[safeStep];
   return <div className="modal-backdrop" role="presentation" onClick={close}><section className="guide-modal" role="dialog" aria-modal="true" aria-labelledby="guide-heading" onClick={(event) => event.stopPropagation()}>
     <div className="guide-modal-top"><div className="brand-lockup dark"><span className="brand-mark">B</span><div><strong>BeVo</strong><small>جولة تعريفية</small></div></div><button className="icon-button" aria-label="إغلاق الجولة" onClick={close}><X size={19} /></button></div>
     <div className="guide-progress"><span style={{ width: `${((step + 1) / guide.length) * 100}%` }} /></div>
-    <div className="guide-content"><div className="guide-art">{current.icon}<span className="guide-spark guide-spark-one" /><span className="guide-spark guide-spark-two" /></div><span className="eyebrow">خطوة {step + 1} من {guide.length}</span><h2 id="guide-heading">{current.title}</h2><p>{current.body}</p><button className="text-button" onClick={() => { onNavigate(current.target); }}>{current.target === "scope" ? "اذهب لإدارة الجروب / السكشن" : current.target === "courses" ? "اذهب للمواد" : current.target === "tasks" ? "اذهب للمهام" : current.target === "notifications" ? "افتح الإشعارات" : "اذهب للرئيسية"} <ArrowLeft size={14} /></button></div>
-    <div className="guide-footer"><button className="btn btn-outline" onClick={close}>تخطي الجولة</button><div className="guide-dots">{guide.map((item, index) => <button key={item.title} aria-label={`الخطوة ${index + 1}`} className={index === step ? "guide-dot guide-dot-active" : "guide-dot"} onClick={() => setStep(index)} />)}</div><div className="guide-nav">{step > 0 ? <button className="btn btn-outline" onClick={() => setStep(step - 1)}>السابق</button> : null}<button className="btn btn-primary" onClick={() => step === guide.length - 1 ? close() : setStep(step + 1)}>{step === guide.length - 1 ? "إنهاء الجولة" : "التالي"} <ArrowLeft size={15} /></button></div></div>
+    <div className="guide-content"><div className="guide-art">{current.icon}<span className="guide-spark guide-spark-one" /><span className="guide-spark guide-spark-two" /></div><span className="eyebrow">خطوة {safeStep + 1} من {guide.length}</span><h2 id="guide-heading">{current.title}</h2><p>{current.body}</p><button className="text-button" onClick={() => { onNavigate(current.target); }}>{current.target === "scope" ? "اذهب لإدارة الجروب / السكشن" : current.target === "courses" ? "اذهب للمواد" : current.target === "tasks" ? "اذهب للمهام" : current.target === "notifications" ? "افتح الإشعارات" : "اذهب للرئيسية"} <ArrowLeft size={14} /></button></div>
+    <div className="guide-footer"><button className="btn btn-outline" onClick={close}>تخطي الجولة</button><div className="guide-dots">{guide.map((item, index) => <button key={item.title} aria-label={`الخطوة ${index + 1}`} className={index === safeStep ? "guide-dot guide-dot-active" : "guide-dot"} onClick={() => setStep(index)} />)}</div><div className="guide-nav">{step > 0 ? <button className="btn btn-outline" onClick={() => setStep(step - 1)}>السابق</button> : null}<button className="btn btn-primary" onClick={() => safeStep === guide.length - 1 ? close() : setStep(safeStep + 1)}>{step === guide.length - 1 ? "إنهاء الجولة" : "التالي"} <ArrowLeft size={15} /></button></div></div>
   </section></div>;
 }
