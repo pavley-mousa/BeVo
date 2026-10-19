@@ -7,7 +7,7 @@ import {
   Search, Settings, ShieldCheck, UserRound, Users, X, Sparkles, Save, Pencil,
   AlertCircle, BadgeCheck, BookMarked, UserCog, Send, Link2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
@@ -915,6 +915,7 @@ export default function BeVoApp() {
           <p className="auth-legal">باستخدام BeVo، استخدم بياناتك الأكاديمية الصحيحة واحفظ بيانات الدخول بأمان.</p>
         </div>
         {notice ? <div className={`toast toast-${notice.tone}`} role="status"><span>{notice.tone === "error" ? <AlertCircle size={17} /> : <CheckCircle2 size={17} />}</span>{notice.text}<button onClick={() => setNotice(null)} aria-label="إغلاق"><X size={15} /></button></div> : null}
+        <SiteContentEditor canEdit={false} userId={session?.user?.id || null} />
       </main>
     );
   }
@@ -944,6 +945,7 @@ export default function BeVoApp() {
           </div>
         </form>
         {notice ? <div className={`toast toast-${notice.tone}`} role="status">{notice.text}</div> : null}
+        <SiteContentEditor canEdit={false} userId={currentUserId || null} />
       </main>
     );
   }
@@ -1170,9 +1172,237 @@ export default function BeVoApp() {
         <footer className="app-footer"><span>BeVo · البوابة الأكاديمية</span><span>البيانات والصلاحيات تُراجع من قاعدة البيانات</span><button className="text-button" onClick={() => { setGuideStep(0); setGuideOpen(true); }}>مساعد <CircleHelp size={14} /></button></footer>
       </div>
       {guideOpen ? <GuideDialog step={guideStep} setStep={setGuideStep} close={() => setGuideOpen(false)} onNavigate={jump} allowedSections={navItems.map((item) => item.id)} /> : null}
+      <SiteContentEditor canEdit={isRoot} userId={currentUserId || null} />
       {notice ? <div className={`toast toast-${notice.tone}`} role="status"><span>{notice.tone === "error" ? <AlertCircle size={17} /> : <CheckCircle2 size={17} />}</span>{notice.text}<button onClick={() => setNotice(null)} aria-label="إغلاق"><X size={15} /></button></div> : null}
     </div>
   );
+}
+
+function SiteContentEditor({ canEdit, userId }: { canEdit: boolean; userId: string | null }) {
+  const [editMode, setEditMode] = useState(false);
+  const [selected, setSelected] = useState<{ key: string; originalText: string } | null>(null);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editorMessage, setEditorMessage] = useState("");
+  const overridesRef = useRef<Map<string, string>>(new Map());
+  const selectedElementRef = useRef<HTMLElement | null>(null);
+  const selectedTextNodeRef = useRef<Text | null>(null);
+  const hoveredElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const applyOverrides = () => {
+      const body = document.body;
+      if (!body) return;
+      const nodes = body.querySelectorAll<HTMLElement>("*");
+      nodes.forEach((element) => {
+        if (element.closest('[data-site-content-editor-ui="true"]')) return;
+        if (/^(SCRIPT|STYLE|NOSCRIPT|INPUT|TEXTAREA|SELECT|OPTION|SVG|PATH)$/.test(element.tagName)) return;
+        const textNodes = Array.from(element.childNodes).filter(
+          (node): node is Text => node.nodeType === Node.TEXT_NODE && Boolean(node.nodeValue?.trim())
+        );
+        if (textNodes.length !== 1) return;
+        const originalText = element.dataset.siteEditorOriginal ?? textNodes[0].nodeValue ?? "";
+        const key = element.dataset.siteEditorKey ?? siteContentKey(element, originalText);
+        element.dataset.siteEditorKey = key;
+        element.dataset.siteEditorOriginal = originalText;
+        const editedText = overridesRef.current.get(key);
+        if (editedText !== undefined && textNodes[0].nodeValue !== editedText) {
+          textNodes[0].nodeValue = editedText;
+        }
+      });
+    };
+
+    const loadOverrides = async () => {
+      const { data: rows, error } = await supabase
+        .from("site_content_overrides")
+        .select("content_key,edited_text");
+      if (!alive) return;
+      if (error) {
+        console.warn("Site content overrides:", error.message);
+        return;
+      }
+      overridesRef.current = new Map((rows || []).map((row) => [row.content_key, row.edited_text]));
+      applyOverrides();
+    };
+    void loadOverrides();
+
+    const observer = new MutationObserver(() => applyOverrides());
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+    return () => {
+      alive = false;
+      observer.disconnect();
+      document.body.classList.remove("site-content-edit-mode");
+    };
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("site-content-edit-mode", editMode && canEdit);
+    return () => document.body.classList.remove("site-content-edit-mode");
+  }, [editMode, canEdit]);
+
+  useEffect(() => {
+    if (!editMode || !canEdit) return;
+    const clearHover = () => {
+      if (hoveredElementRef.current) {
+        delete hoveredElementRef.current.dataset.siteEditorHover;
+        hoveredElementRef.current = null;
+      }
+    };
+    const findTarget = (origin: EventTarget | null): { element: HTMLElement; textNode: Text } | null => {
+      let element = origin instanceof Element ? origin as HTMLElement : null;
+      while (element && element !== document.body) {
+        if (element.closest('[data-site-content-editor-ui="true"]')) return null;
+        if (/^(SCRIPT|STYLE|NOSCRIPT|INPUT|TEXTAREA|SELECT|OPTION|SVG|PATH)$/.test(element.tagName)) return null;
+        const textNodes = Array.from(element.childNodes).filter(
+          (node): node is Text => node.nodeType === Node.TEXT_NODE && Boolean(node.nodeValue?.trim())
+        );
+        if (textNodes.length === 1) return { element, textNode: textNodes[0] };
+        element = element.parentElement;
+      }
+      return null;
+    };
+    const onClick = (event: MouseEvent) => {
+      const found = findTarget(event.target);
+      if (!found) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      const originalText = found.element.dataset.siteEditorOriginal ?? found.textNode.nodeValue ?? "";
+      const key = found.element.dataset.siteEditorKey ?? siteContentKey(found.element, originalText);
+      found.element.dataset.siteEditorKey = key;
+      found.element.dataset.siteEditorOriginal = originalText;
+      selectedElementRef.current = found.element;
+      selectedTextNodeRef.current = found.textNode;
+      setSelected({ key, originalText });
+      setDraft(found.textNode.nodeValue ?? "");
+      setEditorMessage("");
+    };
+    const onMove = (event: MouseEvent) => {
+      clearHover();
+      const found = findTarget(event.target);
+      if (!found) return;
+      found.element.dataset.siteEditorHover = "true";
+      hoveredElementRef.current = found.element;
+    };
+    const onLeave = () => clearHover();
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("mouseover", onMove, true);
+    document.addEventListener("mouseout", onLeave, true);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("mouseover", onMove, true);
+      document.removeEventListener("mouseout", onLeave, true);
+      clearHover();
+    };
+  }, [editMode, canEdit]);
+
+  async function saveText() {
+    if (!selected || !userId) {
+      setEditorMessage("لازم تسجل الدخول بحساب مدير المنصة.");
+      return;
+    }
+    const editedText = draft.slice(0, 5000);
+    setSaving(true);
+    setEditorMessage("");
+    try {
+      const { error } = await supabase.from("site_content_overrides").upsert({
+        content_key: selected.key,
+        original_text: selected.originalText,
+        edited_text: editedText,
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "content_key" });
+      if (error) throw error;
+      overridesRef.current.set(selected.key, editedText);
+      const element = selectedElementRef.current;
+      const textNode = selectedTextNodeRef.current;
+      if (element && textNode && element.isConnected && textNode.isConnected) {
+        element.dataset.siteEditorKey = selected.key;
+        element.dataset.siteEditorOriginal = selected.originalText;
+        textNode.nodeValue = editedText;
+      }
+      setSelected(null);
+      setEditorMessage("تم حفظ التعديل للجميع.");
+    } catch (error) {
+      setEditorMessage(messageOf(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function restoreOriginal() {
+    if (!selected) return;
+    setSaving(true);
+    setEditorMessage("");
+    try {
+      const { error } = await supabase.from("site_content_overrides").delete().eq("content_key", selected.key);
+      if (error) throw error;
+      overridesRef.current.delete(selected.key);
+      const element = selectedElementRef.current;
+      const textNode = selectedTextNodeRef.current;
+      if (element && textNode && element.isConnected && textNode.isConnected) {
+        textNode.nodeValue = selected.originalText;
+      }
+      setSelected(null);
+      setEditorMessage("تمت استعادة النص الأصلي.");
+    } catch (error) {
+      setEditorMessage(messageOf(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      {canEdit ? (
+        <div className="site-content-editor-controls" data-site-content-editor-ui="true">
+          <button className={`site-editor-trigger ${editMode ? "site-editor-trigger-active" : ""}`} onClick={() => {
+            setSelected(null);
+            setEditMode((value) => !value);
+            setEditorMessage("");
+          }}>
+            {editMode ? <X size={17} /> : <Pencil size={17} />}
+            {editMode ? "إنهاء التعديل" : "تعديل الموقع"}
+          </button>
+          {editMode ? <div className="site-editor-hint">اضغط على أي نص ظاهر لتعديله، ثم احفظه. التعديلات تظهر لكل الزوار.</div> : null}
+        </div>
+      ) : null}
+      {selected && canEdit ? (
+        <div className="site-editor-modal-wrap" data-site-content-editor-ui="true">
+          <section className="site-editor-modal" role="dialog" aria-modal="true" aria-labelledby="site-editor-heading">
+            <div className="site-editor-modal-head">
+              <div><span className="site-editor-kicker">تعديل داخل الصفحة</span><h2 id="site-editor-heading">تعديل النص المحدد</h2></div>
+              <button className="icon-button" onClick={() => setSelected(null)} aria-label="إغلاق"><X size={18} /></button>
+            </div>
+            <p>عدّل النص هنا من غير إنشاء صفحة جديدة. هيتحفظ على الموقع لكل المستخدمين.</p>
+            <textarea rows={5} maxLength={5000} value={draft} onChange={(event) => setDraft(event.target.value)} autoFocus />
+            {editorMessage ? <div className="site-editor-message" role="status">{editorMessage}</div> : null}
+            <div className="site-editor-actions">
+              <button className="btn btn-outline" type="button" onClick={() => setSelected(null)} disabled={saving}>إلغاء</button>
+              <button className="btn btn-outline" type="button" onClick={restoreOriginal} disabled={saving}>استعادة الأصل</button>
+              <button className="btn btn-primary" type="button" onClick={saveText} disabled={saving}>{saving ? "جاري الحفظ…" : "حفظ للجميع"} <Save size={15} /></button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function siteContentKey(element: HTMLElement, originalText: string) {
+  const parts: string[] = [];
+  let current: HTMLElement | null = element;
+  while (current && current !== document.body) {
+    const tag = current.tagName.toLowerCase();
+    const parent = current.parentElement;
+    if (!parent) break;
+    const siblings = Array.from(parent.children).filter((sibling) => sibling.tagName === current!.tagName);
+    parts.unshift(`${tag}:nth-of-type(${siblings.indexOf(current) + 1})`);
+    current = parent;
+  }
+  const fingerprint = originalText.replace(/\s+/g, " ").trim().slice(0, 240);
+  return `v1:${parts.join(">")}::${fingerprint}`.slice(0, 2000);
 }
 
 function AdminCourseCatalog({ data, isRoot, isCollegeAdmin, busy, notify, refresh }: {
