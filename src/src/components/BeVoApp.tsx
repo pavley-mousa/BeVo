@@ -218,17 +218,14 @@ export default function BeVoApp() {
             year: currentProfile.enrollment_year || "",
           });
         }
-        setSelectedChoices((previous) => {
-          if (next.selections.length === 0) return previous;
-          const stored: Record<string, { lectureId: string; groupId: string }> = {};
-          next.selections.forEach((selection) => {
-            stored[selection.offering_id] = {
-              lectureId: selection.lecture_option_id || "",
-              groupId: selection.course_group_id || "",
-            };
-          });
-          return { ...stored, ...previous };
+        const storedChoices: Record<string, { lectureId: string; groupId: string }> = {};
+        next.selections.forEach((selection) => {
+          storedChoices[selection.offering_id] = {
+            lectureId: selection.lecture_option_id || "",
+            groupId: selection.course_group_id || "",
+          };
         });
+        setSelectedChoices(storedChoices);
       } catch (error) {
         if (live) notify(messageOf(error), "error");
       } finally {
@@ -259,9 +256,12 @@ export default function BeVoApp() {
   const selectedYearIds = data.years.filter((row) => row.is_current && row.is_active).map((row) => row.id);
   const studentOfferings = data.offerings.filter((offering) =>
     offering.is_active &&
+    Boolean(profile?.college_id) &&
     offering.college_id === profile?.college_id &&
-    (!profile?.study_level_id || offering.study_level_id === profile.study_level_id) &&
-    (selectedYearIds.length === 0 || selectedYearIds.includes(offering.academic_year_id))
+    Boolean(profile?.study_level_id) &&
+    offering.study_level_id === profile?.study_level_id &&
+    selectedYearIds.includes(offering.academic_year_id) &&
+    Boolean(byId(data.terms, offering.term_id)?.is_active)
   );
   const mySelections = data.selections.filter((selection) => selection.student_id === currentUserId);
   const hasRegistration = mySelections.length > 0;
@@ -658,6 +658,14 @@ export default function BeVoApp() {
   }
 
   async function saveRegistration() {
+    if (hasRegistration && pendingMyRequest) {
+      notify("لديك طلب تعديل قيد المراجعة. انتظر القرار قبل إرسال طلب جديد.", "error");
+      return;
+    }
+    if (hasRegistration && changeReason.trim().length < 5) {
+      notify("اكتب سببًا للتعديل لا يقل عن 5 أحرف.", "error");
+      return;
+    }
     const choices = Object.entries(selectedChoices)
       .filter(([, choice]) => choice.lectureId)
       .map(([offeringId, choice]) => ({
@@ -904,8 +912,8 @@ export default function BeVoApp() {
                         </div>
                         {lectures.length === 0 ? <p className="helper-warning"><AlertCircle size={15} /> لم تتم إضافة مواعيد للمحاضرات لهذه المادة بعد.</p> : null}
                       </div>;
-                    })}</div> : <EmptyState title="لم يتم ربط مواد بالكلية والفرقة بعد" detail="ستظهر المواد هنا بعد أن يربطها الأدمن بالعام الأكاديمي والترم." />}
-                    {studentOfferings.length ? <div className="form-actions"><span className="muted small-text">{Object.values(selectedChoices).filter((choice) => choice.lectureId).length} اختيار محدد</span><button className="btn btn-primary" disabled={busy} onClick={saveRegistration}>{busy ? "جاري الحفظ…" : hasRegistration ? "إرسال طلب التعديل" : "حفظ التسجيل"} <ArrowLeft size={17} /></button></div> : null}
+                    })}</div> : <EmptyState title={selectedYearIds.length === 0 ? "لا يوجد عام أكاديمي حالي ومفعّل" : "لم يتم ربط مواد بالكلية والفرقة بعد"} detail={selectedYearIds.length === 0 ? "التسجيل متاح بعد تفعيل عام أكاديمي حالي للكلية." : "ستظهر المواد هنا بعد أن يربطها الأدمن بالعام الأكاديمي والترم."} />}
+                    {studentOfferings.length ? <div className="form-actions"><span className="muted small-text">{Object.values(selectedChoices).filter((choice) => choice.lectureId).length} اختيار محدد</span><button className="btn btn-primary" disabled={busy || (hasRegistration && pendingMyRequest)} onClick={saveRegistration}>{busy ? "جاري الحفظ…" : pendingMyRequest ? "طلبك قيد المراجعة" : hasRegistration ? "إرسال طلب التعديل" : "حفظ التسجيل"} <ArrowLeft size={17} /></button></div> : null}
                     {hasRegistration && selectedChoices && <InputField label="سبب تعديل التسجيل" hint="مطلوب 5 أحرف على الأقل لإرسال طلب التعديل."><textarea rows={2} value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="اكتب سبب طلب التعديل…" /></InputField>}
                     {pendingMyRequest ? <div className="inline-notice"><Clock3 size={16} /> لديك طلب تعديل قيد المراجعة.</div> : null}
                   </Panel>
