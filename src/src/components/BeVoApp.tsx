@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import AdminDataManager from "@/components/AdminDataManager";
 
 type Row = Record<string, any>;
 type Section = "overview" | "courses" | "admin" | "scope" | "tasks" | "resources" | "requests" | "notifications" | "users" | "profile";
@@ -1658,6 +1659,7 @@ function AcademicAdmin({ data, currentUserId, isRoot, isCollegeAdmin, isYearAdmi
   }
   return <div className="stack-lg">
     <div className="page-heading"><div><span className="eyebrow"><ShieldCheck size={14} /> إدارة المنظومة الأكاديمية</span><h1>إدارة الكليات والسنوات والمواد</h1><p>الإجراءات المتاحة تعتمد على الدور والنطاق المعيّن لحسابك.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
+    {isRoot ? <AdminDataManager data={data} refresh={refresh} notify={notify} /> : null}
     {isRoot ? <Panel title="إضافة كلية" subtitle="تبدأ المنظومة بالكلية، ثم العام الأكاديمي والفرق والمواد." icon={<Plus size={18} />}><form className="form-grid" onSubmit={addCollege}><InputField label="اسم الكلية"><input required value={collegeForm.name} onChange={(e) => setCollegeForm({ ...collegeForm, name: e.target.value })} /></InputField><InputField label="كود الكلية"><input required value={collegeForm.code} onChange={(e) => setCollegeForm({ ...collegeForm, code: e.target.value })} /></InputField><div className="form-submit"><button className="btn btn-primary" disabled={busy} type="submit">إضافة الكلية <Plus size={16} /></button></div></form></Panel> : null}
     {(isRoot || isCollegeAdmin) ? <div className="admin-accordion">
       <button className={`accordion-heading ${openPanel === "structure" ? "accordion-active" : ""}`} onClick={() => setOpenPanel(openPanel === "structure" ? "" : "structure")}><span><CalendarDays size={18} /> السنوات والفرق والفصول</span><ChevronDown size={18} /></button>
