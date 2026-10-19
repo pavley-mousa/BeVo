@@ -1404,12 +1404,15 @@ function siteContentKey(element: HTMLElement, originalText: string) {
   const parts: string[] = [];
   let current: HTMLElement | null = element;
   while (current && current !== document.body) {
-    const tag = current.tagName.toLowerCase();
-    const parent = current.parentElement;
-    if (!parent) break;
-    const siblings = Array.from(parent.children).filter((sibling) => sibling.tagName === current!.tagName);
-    parts.unshift(`${tag}:nth-of-type(${siblings.indexOf(current) + 1})`);
-    current = parent;
+    const currentNode: HTMLElement = current;
+    const tag = currentNode.tagName.toLowerCase();
+    const currentTagName = currentNode.tagName;
+    const parentElement: HTMLElement | null = currentNode.parentElement;
+    if (!parentElement) break;
+    const siblingElements = Array.from(parentElement.children) as HTMLElement[];
+    const sameTagSiblings = siblingElements.filter((sibling: HTMLElement) => sibling.tagName === currentTagName);
+    parts.unshift(`${tag}:nth-of-type(${sameTagSiblings.indexOf(currentNode) + 1})`);
+    current = parentElement;
   }
   const fingerprint = originalText.replace(/\s+/g, " ").trim().slice(0, 240);
   return `v1:${parts.join(">")}::${fingerprint}`.slice(0, 2000);
