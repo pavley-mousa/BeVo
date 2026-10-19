@@ -736,8 +736,9 @@ export default function BeVoApp() {
       notify("اكتب سببًا للتعديل لا يقل عن 5 أحرف.", "error");
       return;
     }
+    const currentOfferingIds = new Set(studentOfferings.map((offering) => offering.id));
     const choices = Object.entries(selectedChoices)
-      .filter(([, choice]) => choice.lectureId)
+      .filter(([offeringId, choice]) => currentOfferingIds.has(offeringId) && Boolean(choice.lectureId))
       .map(([offeringId, choice]) => ({
         offering_id: offeringId, lecture_option_id: choice.lectureId, course_group_id: choice.groupId || null,
       }));
@@ -1021,7 +1022,7 @@ export default function BeVoApp() {
                         {lectures.length === 0 ? <p className="helper-warning"><AlertCircle size={15} /> لم تتم إضافة مواعيد للمحاضرات لهذه المادة بعد.</p> : null}
                       </div>;
                     })}</div> : <EmptyState title={!hasCurrentYearForStudent ? "لا يوجد عام أكاديمي حالي ومفعّل لكليتك" : "لم يتم ربط مواد بالكلية والفرقة بعد"} detail={!hasCurrentYearForStudent ? "التسجيل متاح بعد تفعيل عام أكاديمي حالي للكلية." : "ستظهر المواد هنا بعد أن يربطها الأدمن بالعام الأكاديمي والترم."} />}
-                    {studentOfferings.length ? <div className="form-actions"><span className="muted small-text">{Object.values(selectedChoices).filter((choice) => choice.lectureId).length} اختيار محدد</span><button className="btn btn-primary" disabled={busy || (hasRegistration && pendingMyRequest)} onClick={saveRegistration}>{busy ? "جاري الحفظ…" : pendingMyRequest ? "طلبك قيد المراجعة" : hasRegistration ? "إرسال طلب التعديل" : "حفظ التسجيل"} <ArrowLeft size={17} /></button></div> : null}
+                    {studentOfferings.length ? <div className="form-actions"><span className="muted small-text">{studentOfferings.filter((offering) => Boolean(selectedChoices[offering.id]?.lectureId)).length} اختيار محدد</span><button className="btn btn-primary" disabled={busy || (hasRegistration && pendingMyRequest)} onClick={saveRegistration}>{busy ? "جاري الحفظ…" : pendingMyRequest ? "طلبك قيد المراجعة" : hasRegistration ? "إرسال طلب التعديل" : "حفظ التسجيل"} <ArrowLeft size={17} /></button></div> : null}
                     {hasRegistration && selectedChoices && <InputField label="سبب تعديل التسجيل" hint="مطلوب 5 أحرف على الأقل لإرسال طلب التعديل."><textarea rows={2} value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="اكتب سبب طلب التعديل…" /></InputField>}
                     {pendingMyRequest ? <div className="inline-notice"><Clock3 size={16} /> لديك طلب تعديل قيد المراجعة.</div> : null}
                   </Panel>
