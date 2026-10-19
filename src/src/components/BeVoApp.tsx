@@ -475,14 +475,15 @@ export default function BeVoApp() {
     setBusy(true);
     try {
       if (!yearForm.collegeId || !yearForm.label.trim()) throw new Error("اختر كلية واكتب اسم العام الأكاديمي.");
-      if (yearForm.current) {
-        const { error: clearError } = await supabase.from("academic_years").update({ is_current: false }).eq("college_id", yearForm.collegeId);
-        if (clearError) throw clearError;
+      if (yearForm.startsOn && yearForm.endsOn && yearForm.endsOn < yearForm.startsOn) {
+        throw new Error("تاريخ نهاية العام لازم يكون بعد تاريخ بدايته.");
       }
-      const { error } = await supabase.from("academic_years").insert({
-        college_id: yearForm.collegeId, label: yearForm.label.trim(),
-        starts_on: yearForm.startsOn || null, ends_on: yearForm.endsOn || null,
-        is_current: yearForm.current, is_active: true,
+      const { error } = await supabase.rpc("create_academic_year_atomic", {
+        p_college_id: yearForm.collegeId,
+        p_label: yearForm.label.trim(),
+        p_starts_on: yearForm.startsOn || null,
+        p_ends_on: yearForm.endsOn || null,
+        p_is_current: yearForm.current,
       });
       if (error) throw error;
       notify("تمت إضافة العام الأكاديمي."); refresh();
