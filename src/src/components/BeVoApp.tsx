@@ -1202,8 +1202,18 @@ function SiteContentEditor({ canEdit, userId }: { canEdit: boolean; userId: stri
           (node): node is Text => node.nodeType === Node.TEXT_NODE && Boolean(node.nodeValue?.trim())
         );
         if (textNodes.length !== 1) return;
-        const originalText = element.dataset.siteEditorOriginal ?? textNodes[0].nodeValue ?? "";
-        const key = element.dataset.siteEditorKey ?? siteContentKey(element, originalText);
+        let originalText = element.dataset.siteEditorOriginal ?? textNodes[0].nodeValue ?? "";
+        let key = element.dataset.siteEditorKey ?? siteContentKey(element, originalText);
+        const currentText = textNodes[0].nodeValue ?? "";
+        const knownEditedText = overridesRef.current.get(key);
+        // If React reuses an element for a different dynamic record, don't carry the
+        // previous record's edited copy onto the new text.
+        if (element.dataset.siteEditorKey && currentText !== originalText && currentText !== knownEditedText) {
+          delete element.dataset.siteEditorKey;
+          delete element.dataset.siteEditorOriginal;
+          originalText = currentText;
+          key = siteContentKey(element, originalText);
+        }
         element.dataset.siteEditorKey = key;
         element.dataset.siteEditorOriginal = originalText;
         const editedText = overridesRef.current.get(key);
