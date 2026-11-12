@@ -52,8 +52,36 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 function messageOf(error: unknown) {
-  if (error && typeof error === "object" && "message" in error) return String((error as { message: unknown }).message);
-  return String(error || "حصل خطأ غير متوقع.");
+  const raw = error && typeof error === "object" && "message" in error
+    ? String((error as { message: unknown }).message)
+    : String(error || "");
+  if (!raw) return "حصل خطأ غير متوقع. حاول مرة أخرى.";
+  if (/[\u0600-\u06FF]/.test(raw)) return raw;
+
+  const normalized = raw.toLowerCase();
+  const translations: Array<[RegExp, string]> = [
+    [/invalid login credentials|invalid credentials/, "البريد الإلكتروني أو كلمة المرور غير صحيحة."],
+    [/email not confirmed|email_not_confirmed/, "أكد بريدك الإلكتروني أولًا من رسالة التحقق."],
+    [/user already registered|already been registered/, "هذا البريد مسجل بالفعل. جرّب تسجيل الدخول."],
+    [/too many requests|rate limit|request rate limit/, "محاولات كثيرة في وقت قصير. انتظر قليلًا ثم حاول مرة أخرى."],
+    [/jwt expired|token is expired|invalid jwt/, "انتهت جلسة الدخول. سجّل الدخول مرة أخرى."],
+    [/authentication required|not authenticated|auth session missing/, "انتهت جلسة الدخول. سجّل الدخول مرة أخرى."],
+    [/not authorized|permission denied|row-level security|violates row-level security/, "ليس لديك صلاحية لتنفيذ هذا الإجراء."],
+    [/duplicate key|unique constraint|already exists/, "هذا السجل موجود بالفعل."],
+    [/foreign key constraint|still referenced/, "لا يمكن إكمال الإجراء لأن هناك سجلات مرتبطة بهذا العنصر."],
+    [/network error|failed to fetch|fetch failed|load failed/, "تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى."],
+    [/complete your academic profile first/, "أكمل بياناتك الأكاديمية أولًا."],
+    [/choose at least one course/, "اختر مادة واحدة على الأقل."],
+    [/choose only one lecture per course/, "اختر محاضرة واحدة فقط لكل مادة."],
+    [/registration already saved/, "تسجيلك محفوظ بالفعل لهذا العام. استخدم طلب تعديل التسجيل."],
+    [/course is unavailable|requested course is unavailable/, "المادة غير متاحة في الكلية أو الفرقة أو العام الدراسي الحالي."],
+    [/select a valid lecture option|invalid lecture option/, "اختر محاضرة متاحة وصحيحة."],
+    [/select a valid section|valid section required/, "اختر جروبًا أو سكشنًا متاحًا وصحيحًا."],
+    [/section not allowed/, "هذه المادة لا تستخدم جروبات أو سكاشن."]
+  ];
+
+  const match = translations.find(([pattern]) => pattern.test(normalized));
+  return match?.[1] || "حصل خطأ أثناء تنفيذ الطلب. حاول مرة أخرى، ولو استمرت المشكلة تواصل مع مسؤول المنصة.";
 }
 function byId(rows: Row[], id: string | null | undefined) {
   return rows.find((row) => row.id === id);
