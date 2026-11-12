@@ -168,7 +168,7 @@ export default function BeVoApp() {
   const [lectureForm, setLectureForm] = useState({ offeringId: "", label: "المحاضرة A", day: "0", start: "09:00", end: "10:30", instructorName: "", room: "", capacity: "100" });
   const [defaultForm, setDefaultForm] = useState({ groupId: "", userId: "" });
   const [generalRoleForm, setGeneralRoleForm] = useState({ userId: "", role: "college_admin", collegeId: "", yearId: "", levelId: "" });
-  const [taskForm, setTaskForm] = useState({ offeringId: "", groupId: "", type: "task", title: "", description: "", dueAt: "", reminder: "60", published: true });
+  const [taskForm, setTaskForm] = useState({ offeringId: "", groupId: "", type: "task", title: "", description: "", dueAt: "", published: true });
   const [resourceForm, setResourceForm] = useState({ offeringId: "", groupId: "", title: "", description: "", driveUrl: "", youtubeUrl: "", playlistUrl: "", published: true });
   const [addSubjectForm, setAddSubjectForm] = useState({ defaultId: "", courseId: "", termId: "", groupName: "", day: "0", start: "09:00", end: "10:30", assistantName: "", room: "", capacity: "30" });
   const [groupEdits, setGroupEdits] = useState<Record<string, { day: string; start: string; end: string; assistant: string; room: string; capacity: string }>>({});
@@ -716,7 +716,7 @@ export default function BeVoApp() {
         offering_id: taskForm.offeringId, course_group_id: taskForm.groupId || null, created_by: currentUserId,
         task_type: taskForm.type, title: taskForm.title.trim(), description: taskForm.description.trim(),
         due_at: taskForm.dueAt ? new Date(taskForm.dueAt).toISOString() : null,
-        reminder_minutes: [Number(taskForm.reminder) || 60], enable_message: true, enable_sound: true,
+        reminder_minutes: [], enable_message: false, enable_sound: false,
         is_published: taskForm.published,
       });
       if (error) throw error;
@@ -1238,7 +1238,7 @@ export default function BeVoApp() {
                 <InputField label="نوع المهمة"><select value={taskForm.type} onChange={(e) => setTaskForm({ ...taskForm, type: e.target.value })}><option value="task">تاسك</option><option value="lecture_task">تاسك محاضرة</option><option value="quiz">كويز</option><option value="assignment">واجب</option><option value="lecture">محاضرة</option></select></InputField>
                 <InputField label="العنوان"><input required value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} /></InputField>
                 <InputField label="آخر موعد"><input type="datetime-local" value={taskForm.dueAt} onChange={(e) => setTaskForm({ ...taskForm, dueAt: e.target.value })} /></InputField>
-                <InputField label="التذكير قبل الموعد (دقيقة)"><select value={taskForm.reminder} onChange={(e) => setTaskForm({ ...taskForm, reminder: e.target.value })}><option value="15">15 دقيقة</option><option value="30">30 دقيقة</option><option value="60">ساعة</option><option value="1440">يوم</option></select></InputField>
+                <p className="muted small-text">التذكير التلقائي غير متاح حاليًا. سيظهر موعد التسليم للطلاب داخل BeVo.</p>
                 <InputField label="الوصف"><textarea rows={3} value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} /></InputField>
                 <div className="form-submit check-submit"><label className="check-line"><input type="checkbox" checked={taskForm.published} onChange={(e) => setTaskForm({ ...taskForm, published: e.target.checked })} /> نشر المهمة للطلاب</label><button className="btn btn-primary" disabled={busy} type="submit">حفظ المهمة <Plus size={16} /></button></div>
               </form></Panel> : null}
