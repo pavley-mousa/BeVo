@@ -181,7 +181,7 @@ export default function BeVoApp() {
         const pageSize = 400;
         const allRows: Row[] = [];
         for (let offset = 0; ; offset += pageSize) {
-          const { data: rows, error } = await supabase.from(table).select("*").range(offset, offset + pageSize - 1);
+          const { data: rows, error } = await supabase.from(table).select("*").order("id", { ascending: true }).range(offset, offset + pageSize - 1);
           if (error) {
             console.warn("BeVo data read:", table, error.message);
             throw new Error(`تعذر تحميل بيانات ${table}: ${error.message}`);
@@ -210,7 +210,19 @@ export default function BeVoApp() {
           };
           next[keyMap[name]] = result[index];
         });
-        const currentProfile = next.profiles.find((row) => row.id === session.user.id) || null;
+        let currentProfile = next.profiles.find((row) => row.id === session.user.id) || null;
+        if (!currentProfile) {
+          const { data: ownProfile, error: ownProfileError } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .maybeSingle();
+          if (ownProfileError) console.warn("BeVo current profile read:", ownProfileError.message);
+          if (ownProfile) {
+            currentProfile = ownProfile as Row;
+            next.profiles.push(currentProfile);
+          }
+        }
         setProfile(currentProfile);
         setData(next);
         const activeRoles = next.roles.filter((row) => row.user_id === session.user.id && row.is_active);
