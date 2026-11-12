@@ -55,7 +55,7 @@ function messageOf(error: unknown) {
   if (error && typeof error === "object" && "message" in error) return String((error as { message: unknown }).message);
   return String(error || "حصل خطأ غير متوقع.");
 }
-function getAuthRedirectUrl(): string | undefined {
+function getAuthRedirectUrl(path = "/"): string | undefined {
   const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
   if (configuredSiteUrl) {
@@ -66,14 +66,16 @@ function getAuthRedirectUrl(): string | undefined {
         parsedUrl.protocol === "http:" &&
         (parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1");
 
-      if (isSecure || isLocalDevelopment) return parsedUrl.origin;
+      if (isSecure || isLocalDevelopment) return new URL(path, parsedUrl.origin).toString();
       console.error("NEXT_PUBLIC_SITE_URL must use HTTPS outside local development.");
     } catch {
       console.error("NEXT_PUBLIC_SITE_URL must be a valid URL.");
     }
   }
 
-  return typeof window !== "undefined" ? window.location.origin : undefined;
+  return typeof window !== "undefined"
+    ? new URL(path, window.location.origin).toString()
+    : undefined;
 }
 
 function byId(rows: Row[], id: string | null | undefined) {
@@ -407,7 +409,7 @@ export default function BeVoApp() {
     setBusy(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim().toLowerCase(), {
-        redirectTo: getAuthRedirectUrl(),
+        redirectTo: getAuthRedirectUrl("/reset-password"),
       });
       if (error) throw error;
       notify("لو كان البريد مسجلًا، ستصلك رسالة استعادة كلمة المرور.", "success");
@@ -434,6 +436,7 @@ export default function BeVoApp() {
       setAuthScreen("login");
       setActiveSection("overview");
       notify("تم تحديث كلمة المرور بنجاح.", "success");
+      window.location.replace("/");
     } catch (error) { notify(messageOf(error), "error"); }
     finally { setBusy(false); }
   }
