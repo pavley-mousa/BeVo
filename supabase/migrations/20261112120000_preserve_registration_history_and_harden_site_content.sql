@@ -52,6 +52,7 @@ BEGIN
       ON existing_offering.id = s.offering_id
     JOIN public.academic_years existing_year
       ON existing_year.id = existing_offering.academic_year_id
+     AND existing_year.college_id = v_profile.college_id
      AND existing_year.is_current
      AND existing_year.is_active
     WHERE s.student_id = v_uid
@@ -75,6 +76,7 @@ BEGIN
      AND sl.is_active
     JOIN public.academic_years ay
       ON ay.id = o.academic_year_id
+     AND ay.college_id = v_profile.college_id
      AND ay.is_current
      AND ay.is_active
     JOIN public.terms t
