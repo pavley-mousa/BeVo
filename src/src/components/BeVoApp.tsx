@@ -289,6 +289,15 @@ export default function BeVoApp() {
   );
   const hasRegistration = mySelections.length > 0;
   const pendingMyRequest = data.requests.some((request) => request.student_id === currentUserId && request.status === "pending");
+  const upcomingTasks = data.tasks
+    .filter((task) => task.is_published)
+    .slice()
+    .sort((a, b) => {
+      const aDue = a.due_at ? new Date(a.due_at).getTime() : Number.MAX_SAFE_INTEGER;
+      const bDue = b.due_at ? new Date(b.due_at).getTime() : Number.MAX_SAFE_INTEGER;
+      return aDue - bDue;
+    })
+    .slice(0, 4);
 
   const navItems = useMemo(() => {
     const items: { id: Section; label: string; icon: ReactNode; show: boolean }[] = [
@@ -789,8 +798,18 @@ export default function BeVoApp() {
   }
 
   async function markNotificationRead(notificationId: string) {
-    const { error } = await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", notificationId);
-    if (error) notify(messageOf(error), "error"); else refresh();
+    const readAt = new Date().toISOString();
+    const { error } = await supabase.from("notifications").update({ read_at: readAt }).eq("id", notificationId);
+    if (error) {
+      notify(messageOf(error), "error");
+      return;
+    }
+    setData((current) => ({
+      ...current,
+      notifications: current.notifications.map((notification) =>
+        notification.id === notificationId ? { ...notification, read_at: readAt } : notification
+      ),
+    }));
   }
 
   function currentCourseName(offeringId: string) {
@@ -1026,14 +1045,14 @@ export default function BeVoApp() {
               </section>
               {!allRoles.length && !profile?.college_id ? <Panel title="تفعيل مدير المنصة" subtitle="هذا المسار مخصص لتهيئة أول مدير منصة فقط، ويتطلب رمز التهيئة السري." icon={<ShieldCheck size={18} />}><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void claimFirstAdmin(); }}><InputField label="رمز التهيئة"><input value={claimToken} onChange={(e) => setClaimToken(e.target.value)} required type="password" autoComplete="one-time-code" /></InputField><button className="btn btn-primary" disabled={busy || !claimToken.trim()} type="submit">تفعيل Super Admin</button></form></Panel> : null}
               <div className="stats-grid">
-                <div className="stat-card"><span className="stat-icon stat-blue"><BookOpen size={20} /></span><div><small>{isAdmin ? "المواد المتاحة في نطاقك" : "موادي الدراسية"}</small><strong>{isAdmin ? data.offerings.length : mySelections.length}</strong><span>{isAdmin ? "ربط أكاديمي" : "مادة مسجلة"}</span></div></div>
+                <div className="stat-card"><span className="stat-icon stat-blue"><BookOpen size={20} /></span><div><small>{isAdmin ? "المواد المتاحة في نطاقك" : "موادي الدراسية"}</small><strong>{isAdmin ? data.offerings.filter((offering) => offering.is_active).length : mySelections.length}</strong><span>{isAdmin ? "ربط أكاديمي" : "مادة مسجلة"}</span></div></div>
                 <div className="stat-card"><span className="stat-icon stat-violet"><ClipboardList size={20} /></span><div><small>المهام المفتوحة</small><strong>{data.tasks.filter((task) => task.is_published).length}</strong><span>تاسك وتكليف</span></div></div>
                 <div className="stat-card"><span className="stat-icon stat-amber"><Bell size={20} /></span><div><small>إشعارات غير مقروءة</small><strong>{data.notifications.filter((notification) => !notification.read_at).length}</strong><span>تحديث جديد</span></div></div>
                 <div className="stat-card"><span className="stat-icon stat-green"><Users size={20} /></span><div><small>{isAdmin ? "طلبات معلقة" : "حالة التسجيل"}</small><strong>{isAdmin ? data.requests.filter((request) => request.status === "pending").length : hasRegistration ? "✓" : "—"}</strong><span>{isAdmin ? "تحتاج مراجعة" : hasRegistration ? "تم حفظ المواد" : "لم يتم التسجيل بعد"}</span></div></div>
               </div>
               <div className="content-grid two-col">
                 <Panel title="المواعيد والمهام القادمة" subtitle="المهام المنشورة المرتبطة بموادك." icon={<CalendarDays size={18} />} action={<button className="text-button" onClick={() => jump("tasks")}>عرض الكل <ArrowLeft size={14} /></button>}>
-                  {data.tasks.filter((task) => task.is_published).slice(0, 4).length ? <div className="compact-list">{data.tasks.filter((task) => task.is_published).slice(0, 4).map((task) => <div className="compact-row" key={task.id}><span className="list-icon"><ClipboardList size={17} /></span><div className="compact-main"><strong>{task.title}</strong><small>{currentCourseName(task.offering_id)} · {task.due_at ? new Date(task.due_at).toLocaleDateString("ar-EG") : "بدون موعد محدد"}</small></div><span className={`status-pill ${task.is_published ? "status-published" : ""}`}>{task.task_type === "quiz" ? "كويز" : task.task_type === "assignment" ? "واجب" : "مهمة"}</span></div>)}</div> : <EmptyState title="لا توجد مواعيد قريبة" detail="المهام المنشورة ستظهر هنا." />}
+                  {upcomingTasks.length ? <div className="compact-list">{upcomingTasks.map((task) => <div className="compact-row" key={task.id}><span className="list-icon"><ClipboardList size={17} /></span><div className="compact-main"><strong>{task.title}</strong><small>{currentCourseName(task.offering_id)} · {task.due_at ? new Date(task.due_at).toLocaleDateString("ar-EG") : "بدون موعد محدد"}</small></div><span className={`status-pill ${task.is_published ? "status-published" : ""}`}>{task.task_type === "quiz" ? "كويز" : task.task_type === "assignment" ? "واجب" : "مهمة"}</span></div>)}</div> : <EmptyState title="لا توجد مواعيد قريبة" detail="المهام المنشورة ستظهر هنا." />}
                 </Panel>
                 <Panel title="اختصارات سريعة" subtitle="انتقل مباشرة للقسم الذي تحتاجه." icon={<Sparkles size={18} />}>
                   <div className="quick-grid">
@@ -1044,7 +1063,7 @@ export default function BeVoApp() {
                   </div>
                 </Panel>
               </div>
-              {isRoot || isCollegeAdmin ? <Panel title="حالة المنظومة" subtitle="ملخص سريع لما تم تسجيله." icon={<ShieldCheck size={18} />}><div className="summary-strip"><div><small>الكليات</small><strong>{data.colleges.length}</strong></div><div><small>الأعوام</small><strong>{data.years.length}</strong></div><div><small>الفرق</small><strong>{data.levels.length}</strong></div><div><small>المواد</small><strong>{data.courses.length}</strong></div><div><small>الجروبات والسكاشن</small><strong>{data.groups.length}</strong></div></div></Panel> : null}
+              {isRoot || isCollegeAdmin ? <Panel title="حالة المنظومة" subtitle="ملخص سريع لما تم تسجيله." icon={<ShieldCheck size={18} />}><div className="summary-strip"><div><small>الكليات</small><strong>{data.colleges.filter((row) => row.is_active).length}</strong></div><div><small>الأعوام</small><strong>{data.years.filter((row) => row.is_active).length}</strong></div><div><small>الفرق</small><strong>{data.levels.filter((row) => row.is_active).length}</strong></div><div><small>المواد</small><strong>{data.courses.filter((row) => row.is_active).length}</strong></div><div><small>الجروبات والسكاشن</small><strong>{data.groups.filter((row) => row.is_active).length}</strong></div></div></Panel> : null}
             </>
           ) : null}
 
