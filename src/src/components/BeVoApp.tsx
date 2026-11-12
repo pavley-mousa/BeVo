@@ -106,6 +106,7 @@ function EmptyState({ title, detail }: { title: string; detail?: string }) {
 
 export default function BeVoApp() {
   const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
@@ -155,18 +156,22 @@ export default function BeVoApp() {
 
   useEffect(() => {
     let live = true;
-    supabase.auth.getSession().then(({ data: result }) => {
-      if (!live) return;
-      setSession(result.session);
-      setUser(result.session?.user ?? null);
-    }).catch((error: unknown) => {
-      if (live) notify(messageOf(error), "error");
-    });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!live) return;
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
+      setAuthReady(true);
       if (event === "PASSWORD_RECOVERY") setAuthScreen("reset");
+    });
+    supabase.auth.getSession().then(({ data: result }) => {
+      if (!live) return;
+      setSession(result.session);
+      setUser(result.session?.user ?? null);
+      setAuthReady(true);
+    }).catch((error: unknown) => {
+      if (!live) return;
+      setAuthReady(true);
+      notify(messageOf(error), "error");
     });
     return () => {
       live = false;
@@ -857,8 +862,37 @@ export default function BeVoApp() {
     setMobileNav(false);
   }
   const currentSectionLabel = navItems.find((item) => item.id === activeSection)?.label || "نظرة عامة";
+  const isPasswordResetRoute =
+    typeof window !== "undefined" && window.location.pathname.replace(/\\/+$/, "") === "/reset-password";
 
-  if (session?.user && authScreen === "reset") {
+  if (isPasswordResetRoute && !authReady) {
+    return (
+      <main className="profile-setup-page" dir="rtl" lang="ar">
+        <div className="brand-lockup dark"><span className="brand-mark">B</span><div><strong>BeVo</strong><small>استعادة كلمة المرور</small></div></div>
+        <section className="profile-setup-card" aria-live="polite">
+          <span className="card-symbol"><ShieldCheck size={23} /></span>
+          <h1>جاري التحقق من رابط الاستعادة</h1>
+          <p className="muted">لحظة واحدة، بنتأكد من صلاحية الرابط قبل تغيير كلمة المرور.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (isPasswordResetRoute && authReady && !session?.user) {
+    return (
+      <main className="profile-setup-page" dir="rtl" lang="ar">
+        <div className="brand-lockup dark"><span className="brand-mark">B</span><div><strong>BeVo</strong><small>استعادة كلمة المرور</small></div></div>
+        <section className="profile-setup-card">
+          <span className="card-symbol"><AlertCircle size={23} /></span>
+          <h1>رابط الاستعادة غير صالح</h1>
+          <p className="muted">الرابط انتهت صلاحيته أو تم استخدامه بالفعل. ارجع لصفحة تسجيل الدخول واطلب رابط استعادة جديد.</p>
+          <button className="btn btn-primary btn-wide" type="button" onClick={() => window.location.replace("/")}>العودة لتسجيل الدخول</button>
+        </section>
+      </main>
+    );
+  }
+
+  if (session?.user && (authScreen === "reset" || isPasswordResetRoute)) {
     return (
       <main className="profile-setup-page" dir="rtl" lang="ar">
         <div className="brand-lockup dark"><span className="brand-mark">B</span><div><strong>BeVo</strong><small>استعادة كلمة المرور</small></div></div>
