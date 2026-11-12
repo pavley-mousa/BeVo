@@ -566,8 +566,7 @@ export default function BeVoApp() {
         });
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("course_offerings")
-          .upsert(row, { onConflict: "course_id,academic_year_id,study_level_id,term_id" });
+        const { error } = await supabase.from("course_offerings").insert(row);
         if (error) throw error;
       }
       notify("تم ربط المادة بالعام والفرقة والترم."); refresh();
@@ -1437,10 +1436,10 @@ function AdminCourseCatalog({ data, isRoot, isCollegeAdmin, busy, notify, refres
     try {
       const course = byId(data.courses, courseId);
       if (!course || !yearId || !levelId || !termId) throw new Error("اختر المادة والعام والفرقة والترم.");
-      const { error } = await supabase.from("course_offerings").upsert({
+      const { error } = await supabase.from("course_offerings").insert({
         course_id: course.id, college_id: course.college_id, academic_year_id: yearId, study_level_id: levelId,
         term_id: termId, requires_section: requiresSection, is_active: true,
-      }, { onConflict: "course_id,academic_year_id,study_level_id,term_id" });
+      });
       if (error) throw error;
       notify("تم ربط المادة بالعام والفرقة والترم."); refresh();
     } catch (error) { notify(messageOf(error), "error"); }
