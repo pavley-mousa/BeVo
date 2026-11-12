@@ -86,6 +86,19 @@ function messageOf(error: unknown) {
 function byId(rows: Row[], id: string | null | undefined) {
   return rows.find((row) => row.id === id);
 }
+function validateLectureOption(lectures: Row[], offeringId: string, label: string, startsAt: string, endsAt: string) {
+  if (!offeringId || !label.trim()) throw new Error("اختر المادة واكتب اسم المحاضرة.");
+  if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(startsAt) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(endsAt)) {
+    throw new Error("أدخل وقت بداية ونهاية صحيحًا.");
+  }
+  const [startHour, startMinute] = startsAt.split(":").map(Number);
+  const [endHour, endMinute] = endsAt.split(":").map(Number);
+  if (endHour * 60 + endMinute <= startHour * 60 + startMinute) {
+    throw new Error("وقت النهاية لازم يكون بعد وقت البداية.");
+  }
+  const activeCount = lectures.filter((lecture) => lecture.offering_id === offeringId && lecture.is_active === true).length;
+  if (activeCount >= 4) throw new Error("الحد الأقصى 4 اختيارات محاضرة نشطة لكل مادة.");
+}
 function fullName(profile: Row | null | undefined) {
   return [profile?.first_name, profile?.middle_name, profile?.third_name].filter(Boolean).join(" ") || "مستخدم BeVo";
 }
@@ -623,9 +636,7 @@ export default function BeVoApp() {
     event.preventDefault();
     setBusy(true);
     try {
-      const existing = data.lectures.filter((lecture) => lecture.offering_id === lectureForm.offeringId);
-      if (existing.length >= 4) throw new Error("الحد الأقصى 4 اختيارات محاضرة لكل مادة.");
-      if (!lectureForm.offeringId || !lectureForm.label.trim()) throw new Error("اختر المادة واكتب اسم المحاضرة.");
+      validateLectureOption(data.lectures, lectureForm.offeringId, lectureForm.label, lectureForm.start, lectureForm.end);
       const { error } = await supabase.from("lecture_options").insert({
         offering_id: lectureForm.offeringId, label: lectureForm.label.trim(), day_of_week: Number(lectureForm.day),
         starts_at: lectureForm.start, ends_at: lectureForm.end,
@@ -1548,7 +1559,7 @@ function AdminCourseCatalog({ data, isRoot, isCollegeAdmin, busy, notify, refres
   async function createLecture(event: FormEvent) {
     event.preventDefault(); setBusyLocal(true);
     try {
-      if (data.lectures.filter((row) => row.offering_id === lectureDraft.offeringId).length >= 4) throw new Error("الحد الأقصى 4 اختيارات محاضرة.");
+      validateLectureOption(data.lectures, lectureDraft.offeringId, lectureDraft.label, lectureDraft.start, lectureDraft.end);
       const { error } = await supabase.from("lecture_options").insert({
         offering_id: lectureDraft.offeringId, label: lectureDraft.label.trim(), day_of_week: Number(lectureDraft.day),
         starts_at: lectureDraft.start, ends_at: lectureDraft.end, instructor_name: lectureDraft.instructorName.trim() || null,
@@ -1667,12 +1678,10 @@ function YearAdminWorkspace({ data, currentUserId, refresh, notify }: {
       notify("اختر مادة داخل نطاقك واكتب اسم المحاضرة.", "error");
       return;
     }
-    if (lectureForm.end <= lectureForm.start) {
-      notify("وقت النهاية لازم يكون بعد وقت البداية.", "error");
-      return;
-    }
-    if (data.lectures.filter((row) => row.offering_id === offering.id).length >= 4) {
-      notify("الحد الأقصى 4 اختيارات محاضرة لكل مادة.", "error");
+    try {
+      validateLectureOption(data.lectures, offering.id, lectureForm.label, lectureForm.start, lectureForm.end);
+    } catch (error) {
+      notify(messageOf(error), "error");
       return;
     }
     setBusy(true);
