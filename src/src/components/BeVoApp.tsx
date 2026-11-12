@@ -86,6 +86,14 @@ function messageOf(error: unknown) {
 function byId(rows: Row[], id: string | null | undefined) {
   return rows.find((row) => row.id === id);
 }
+function isAllowedHttpsUrl(value: string, hosts: string[]) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && hosts.includes(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 function validateLectureOption(lectures: Row[], offeringId: string, label: string, startsAt: string, endsAt: string) {
   if (!offeringId || !label.trim()) throw new Error("اختر المادة واكتب اسم المحاضرة.");
   if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(startsAt) || !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(endsAt)) {
@@ -730,8 +738,15 @@ export default function BeVoApp() {
         (!resourceForm.groupId || !data.scopedGroups.some((group) => group.id === resourceForm.groupId && group.offering_id === resourceForm.offeringId && group.is_active))) {
         throw new Error("أدمن الجروب أو السكشن لازم يختار نطاقه المعيّن له.");
       }
-      if ([resourceForm.driveUrl, resourceForm.youtubeUrl, resourceForm.playlistUrl].some((url) => url && !/^https:\/\//i.test(url))) {
-        throw new Error("كل روابط المصادر يجب أن تبدأ بـ HTTPS.");
+      if (resourceForm.driveUrl.trim() && !isAllowedHttpsUrl(resourceForm.driveUrl.trim(), ["drive.google.com", "docs.google.com"])) {
+        throw new Error("رابط Google Drive يجب أن يكون من drive.google.com أو docs.google.com وباستخدام HTTPS.");
+      }
+      const youtubeHosts = ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"];
+      if (resourceForm.youtubeUrl.trim() && !isAllowedHttpsUrl(resourceForm.youtubeUrl.trim(), youtubeHosts)) {
+        throw new Error("رابط الفيديو يجب أن يكون من YouTube أو youtu.be وباستخدام HTTPS.");
+      }
+      if (resourceForm.playlistUrl.trim() && !isAllowedHttpsUrl(resourceForm.playlistUrl.trim(), youtubeHosts)) {
+        throw new Error("رابط قائمة التشغيل يجب أن يكون من YouTube أو youtu.be وباستخدام HTTPS.");
       }
       const { error } = await supabase.from("course_resources").insert({
         offering_id: resourceForm.offeringId, course_group_id: resourceForm.groupId || null,
