@@ -83,6 +83,7 @@ function EmptyState({ title, detail }: { title: string; detail?: string }) {
 
 export default function BeVoApp() {
   const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
@@ -136,13 +137,17 @@ export default function BeVoApp() {
       if (!live) return;
       setSession(result.session);
       setUser(result.session?.user ?? null);
+      setAuthReady(true);
     }).catch((error: unknown) => {
-      if (live) notify(messageOf(error), "error");
+      if (!live) return;
+      notify(messageOf(error), "error");
+      setAuthReady(true);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!live) return;
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
+      setAuthReady(true);
       if (event === "PASSWORD_RECOVERY") setAuthScreen("reset");
     });
     return () => {
@@ -852,6 +857,17 @@ export default function BeVoApp() {
     setMobileNav(false);
   }
   const currentSectionLabel = navItems.find((item) => item.id === activeSection)?.label || "نظرة عامة";
+
+  if (!authReady) {
+    return (
+      <main className="boot-screen" dir="rtl" lang="ar">
+        <div className="boot-mark">B</div>
+        <div className="boot-spinner" />
+        <strong>جاري تجهيز BeVo…</strong>
+        <span>المنصة الأكاديمية</span>
+      </main>
+    );
+  }
 
   if (session?.user && authScreen === "reset") {
     return (
