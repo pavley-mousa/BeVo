@@ -656,7 +656,7 @@ export default function BeVoApp() {
       });
       if (error) throw error;
       setTaskForm({ ...taskForm, title: "", description: "", dueAt: "" });
-      notify("تم حفظ المهمة وإعدادات التذكير."); refresh();
+      notify("تم حفظ المهمة. يمكنك متابعة موعد التسليم من قائمة المهام."); refresh();
     } catch (error) { notify(messageOf(error), "error"); }
     finally { setBusy(false); }
   }
@@ -859,7 +859,7 @@ export default function BeVoApp() {
             <p data-site-editable="true" data-site-editable-id="landing-tagline">نظام موحّد للكليات والفرق والسكاشن بصلاحيات واضحة وتجربة بسيطة.</p>
             <div className="feature-stack">
               <div><span className="feature-icon"><BookOpen size={18} /></span><div><strong>تسجيل أكاديمي منظم</strong><small>اختار المحاضرة ثم السكشن إذا كانت المادة تتطلبه.</small></div></div>
-              <div><span className="feature-icon"><Bell size={18} /></span><div><strong>تذكيرات للمواعيد</strong><small>تابع التاسكات والتكليفات من مكان واحد.</small></div></div>
+              <div><span className="feature-icon"><Bell size={18} /></span><div><strong>مواعيد المهام</strong><small>تابع مواعيد التسليم والتكليفات من مكان واحد.</small></div></div>
               <div><span className="feature-icon"><ShieldCheck size={18} /></span><div><strong>صلاحيات واضحة</strong><small>كل أدمن يدير النطاق المخصص له فقط.</small></div></div>
             </div>
           </div>
