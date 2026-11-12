@@ -88,7 +88,7 @@ function byId(rows: Row[], id: string | null | undefined) {
 }
 function validateLectureOption(lectures: Row[], offeringId: string, label: string, startsAt: string, endsAt: string) {
   if (!offeringId || !label.trim()) throw new Error("اختر المادة واكتب اسم المحاضرة.");
-  if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(startsAt) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(endsAt)) {
+  if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(startsAt) || !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(endsAt)) {
     throw new Error("أدخل وقت بداية ونهاية صحيحًا.");
   }
   const [startHour, startMinute] = startsAt.split(":").map(Number);
