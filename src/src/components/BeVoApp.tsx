@@ -181,7 +181,7 @@ export default function BeVoApp() {
         const pageSize = 400;
         const allRows: Row[] = [];
         for (let offset = 0; ; offset += pageSize) {
-          const { data: rows, error } = await supabase.from(table).select("*").range(offset, offset + pageSize - 1);
+          const { data: rows, error } = await supabase.from(table).select("*").order("id", { ascending: true }).range(offset, offset + pageSize - 1);
           if (error) {
             console.warn("BeVo data read:", table, error.message);
             throw new Error(`تعذر تحميل بيانات ${table}: ${error.message}`);
@@ -276,7 +276,10 @@ export default function BeVoApp() {
     selectedYearIds.includes(offering.academic_year_id) &&
     Boolean(byId(data.terms, offering.term_id)?.is_active)
   );
-  const mySelections = data.selections.filter((selection) => selection.student_id === currentUserId);
+  const currentStudentOfferingIds = new Set(studentOfferings.map((offering) => offering.id));
+  const mySelections = data.selections.filter((selection) =>
+    selection.student_id === currentUserId && currentStudentOfferingIds.has(selection.offering_id)
+  );
   const hasRegistration = mySelections.length > 0;
   const pendingMyRequest = data.requests.some((request) => request.student_id === currentUserId && request.status === "pending");
 
@@ -828,8 +831,8 @@ export default function BeVoApp() {
         <div className="brand-lockup dark"><span className="brand-mark">B</span><div><strong>BeVo</strong><small>استعادة كلمة المرور</small></div></div>
         <form className="profile-setup-card" onSubmit={updatePasswordFromRecovery}>
           <span className="card-symbol"><ShieldCheck size={23} /></span>
-          <h1>تعيين كلمة مرور جديدة</h1>
-          <p className="muted">اختر كلمة مرور جديدة لا تقل عن 8 أحرف.</p>
+          <h1 data-site-editable="true" data-site-editable-id="reset-password-title">تعيين كلمة مرور جديدة</h1>
+          <p className="muted" data-site-editable="true" data-site-editable-id="reset-password-help">اختر كلمة مرور جديدة لا تقل عن 8 أحرف.</p>
           <InputField label="كلمة المرور الجديدة"><input required type="password" autoComplete="new-password" minLength={8} value={resetPasswordDraft.password} onChange={(e) => setResetPasswordDraft({ ...resetPasswordDraft, password: e.target.value })} /></InputField>
           <InputField label="تأكيد كلمة المرور الجديدة"><input required type="password" autoComplete="new-password" value={resetPasswordDraft.confirm} onChange={(e) => setResetPasswordDraft({ ...resetPasswordDraft, confirm: e.target.value })} /></InputField>
           <button className="btn btn-primary btn-wide" type="submit" disabled={busy}>{busy ? "جاري تحديث كلمة المرور…" : "حفظ كلمة المرور"} <Check size={17} /></button>
@@ -848,7 +851,7 @@ export default function BeVoApp() {
           <div className="auth-hero">
             <span className="eyebrow"><Sparkles size={15} /> مساحة واحدة لدراستك</span>
             <h1>كل موادك ومواعيدك ومهامك… <em>في مكان واحد.</em></h1>
-            <p>نظام موحّد للكليات والفرق والسكاشن بصلاحيات واضحة وتجربة بسيطة.</p>
+            <p data-site-editable="true" data-site-editable-id="landing-tagline">نظام موحّد للكليات والفرق والسكاشن بصلاحيات واضحة وتجربة بسيطة.</p>
             <div className="feature-stack">
               <div><span className="feature-icon"><BookOpen size={18} /></span><div><strong>تسجيل أكاديمي منظم</strong><small>اختار المحاضرة ثم السكشن إذا كانت المادة تتطلبه.</small></div></div>
               <div><span className="feature-icon"><Bell size={18} /></span><div><strong>تذكيرات للمواعيد</strong><small>تابع التاسكات والتكليفات من مكان واحد.</small></div></div>
@@ -863,7 +866,7 @@ export default function BeVoApp() {
             {authScreen === "login" ? (
               <>
                 <span className="card-symbol"><UserRound size={22} /></span>
-                <h2>أهلًا بك في BeVo</h2><p className="muted">سجّل دخولك لمتابعة موادك الدراسية.</p>
+                <h2 data-site-editable="true" data-site-editable-id="auth-login-title">أهلًا بك في BeVo</h2><p className="muted" data-site-editable="true" data-site-editable-id="auth-login-help">سجّل دخولك لمتابعة موادك الدراسية.</p>
                 <form className="form-stack" onSubmit={signIn}>
                   <InputField label="البريد الإلكتروني"><input type="email" required autoComplete="email" placeholder="name@example.com" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} /></InputField>
                   <InputField label="كلمة مرور الموقع"><div className="password-field"><input type={showPassword ? "text" : "password"} required autoComplete="current-password" placeholder="أدخل كلمة المرور" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} /><button type="button" className="icon-button" aria-label="إظهار كلمة المرور" onClick={() => setShowPassword((v) => !v)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></InputField>
@@ -877,7 +880,7 @@ export default function BeVoApp() {
             ) : null}
             {authScreen === "signup" ? (
               <>
-                <span className="card-symbol"><GraduationCap size={23} /></span><h2>إنشاء حساب طالب</h2><p className="muted">استخدم بياناتك الأكاديمية كما هي في الجامعة.</p>
+                <span className="card-symbol"><GraduationCap size={23} /></span><h2 data-site-editable="true" data-site-editable-id="auth-signup-title">إنشاء حساب طالب</h2><p className="muted" data-site-editable="true" data-site-editable-id="auth-signup-help">استخدم بياناتك الأكاديمية كما هي في الجامعة.</p>
                 <form className="form-stack" onSubmit={signUp}>
                   <div className="grid-two">
                     <InputField label="الاسم الأول"><input required value={signupDraft.first} onChange={(e) => setSignupDraft({ ...signupDraft, first: e.target.value })} /></InputField>
@@ -907,13 +910,13 @@ export default function BeVoApp() {
             ) : null}
             {authScreen === "forgot" ? (
               <>
-                <span className="card-symbol"><ShieldCheck size={22} /></span><h2>استعادة كلمة المرور</h2><p className="muted">هنرسل لك رابط الاستعادة على بريدك إذا كان مسجلًا.</p>
+                <span className="card-symbol"><ShieldCheck size={22} /></span><h2 data-site-editable="true" data-site-editable-id="auth-recovery-title">استعادة كلمة المرور</h2><p className="muted" data-site-editable="true" data-site-editable-id="auth-recovery-help">هنرسل لك رابط الاستعادة على بريدك إذا كان مسجلًا.</p>
                 <form className="form-stack" onSubmit={sendPasswordReset}><InputField label="البريد الإلكتروني"><input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} /></InputField><button className="btn btn-primary btn-wide" disabled={busy} type="submit">{busy ? "جاري الإرسال…" : "إرسال رابط الاستعادة"}</button></form>
                 <div className="auth-bottom"><button className="text-button" type="button" onClick={() => setAuthScreen("login")}>رجوع لتسجيل الدخول</button></div>
               </>
             ) : null}
           </div>
-          <p className="auth-legal">باستخدام BeVo، استخدم بياناتك الأكاديمية الصحيحة واحفظ بيانات الدخول بأمان.</p>
+          <p className="auth-legal" data-site-editable="true" data-site-editable-id="auth-legal-copy">باستخدام BeVo، استخدم بياناتك الأكاديمية الصحيحة واحفظ بيانات الدخول بأمان.</p>
         </div>
         {notice ? <div className={`toast toast-${notice.tone}`} role="status"><span>{notice.tone === "error" ? <AlertCircle size={17} /> : <CheckCircle2 size={17} />}</span>{notice.text}<button onClick={() => setNotice(null)} aria-label="إغلاق"><X size={15} /></button></div> : null}
         <SiteContentEditor canEdit={false} userId={session?.user?.id || null} />
@@ -926,8 +929,8 @@ export default function BeVoApp() {
       <main className="profile-setup-page" dir="rtl" lang="ar">
         <div className="brand-lockup dark"><span className="brand-mark">B</span><div><strong>BeVo</strong><small>إكمال البيانات الأكاديمية</small></div></div>
         <form className="profile-setup-card" onSubmit={finishAcademicProfile}>
-          <span className="card-symbol"><GraduationCap size={23} /></span><h1>كمّل بياناتك الأكاديمية</h1>
-          <p className="muted">اربط حسابك بسجلك الجامعي. نستخدم البيانات دي لتحديد المواد والصلاحيات المتاحة لك.</p>
+          <span className="card-symbol"><GraduationCap size={23} /></span><h1 data-site-editable="true" data-site-editable-id="profile-setup-title">كمّل بياناتك الأكاديمية</h1>
+          <p className="muted" data-site-editable="true" data-site-editable-id="profile-setup-help">اربط حسابك بسجلك الجامعي. نستخدم البيانات دي لتحديد المواد والصلاحيات المتاحة لك.</p>
           <div className="grid-two">
             <InputField label="الاسم الأول"><input required value={profileDraft.first} onChange={(e) => setProfileDraft({ ...profileDraft, first: e.target.value })} /></InputField>
             <InputField label="الاسم الثاني"><input required value={profileDraft.middle} onChange={(e) => setProfileDraft({ ...profileDraft, middle: e.target.value })} /></InputField>
@@ -1005,7 +1008,7 @@ export default function BeVoApp() {
 
           {activeSection === "courses" ? (
             <div className="stack-lg">
-              <div className="page-heading"><div><span className="eyebrow"><BookOpen size={14} /> موادك الدراسية</span><h1>المواد والمحاضرات</h1><p>{isAdmin ? "راجع ربط المواد ومواعيد المحاضرات والسكاشن المتاحة في نطاقك." : "اختار المادة والمحاضرة والسكشن إذا كانت المادة تتطلب سكاشن."}</p></div><button className="btn btn-outline" onClick={refresh} disabled={busy}><RefreshCw size={16} /> تحديث</button></div>
+              <div className="page-heading"><div><span className="eyebrow"><BookOpen size={14} /> موادك الدراسية</span><h1 data-site-editable="true" data-site-editable-id="student-courses-title">المواد والمحاضرات</h1><p>{isAdmin ? "راجع ربط المواد ومواعيد المحاضرات والسكاشن المتاحة في نطاقك." : "اختار المادة والمحاضرة والسكشن إذا كانت المادة تتطلب سكاشن."}</p></div><button className="btn btn-outline" onClick={refresh} disabled={busy}><RefreshCw size={16} /> تحديث</button></div>
               {!profile?.college_id ? <EmptyState title="أكمل بياناتك الأكاديمية أولًا" detail="لازم تربط حسابك بالكلية والفرقة قبل عرض المواد." /> : null}
               {isAdmin ? <AdminCourseCatalog data={data} isRoot={isRoot} isCollegeAdmin={isCollegeAdmin} busy={busy} notify={notify} refresh={refresh} /> : (
                 <>
@@ -1054,7 +1057,7 @@ export default function BeVoApp() {
 
           {activeSection === "scope" ? (
             <div className="stack-lg">
-              <div className="page-heading"><div><span className="eyebrow"><Layers size={14} /> نطاقك فقط</span><h1>إدارة الجروب / السكشن</h1><p>كل مسؤول يرى الجروبات أو السكاشن المعيّنة له فقط، ويقدر يحدّث الوقت والقاعة واسم المعيد.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
+              <div className="page-heading"><div><span className="eyebrow"><Layers size={14} /> نطاقك فقط</span><h1 data-site-editable="true" data-site-editable-id="group-scope-title">إدارة الجروب / السكشن</h1><p>كل مسؤول يرى الجروبات أو السكاشن المعيّنة له فقط، ويقدر يحدّث الوقت والقاعة واسم المعيد.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
               {myDefaults.length ? <Panel title="إضافة مادة لنطاقك" subtitle="المادة الجديدة ترتبط بالكلية والعام والفرقة والسكشن المخصص لك." icon={<Plus size={18} />}>
                 <form className="form-grid" onSubmit={addSubject}>
                   <InputField label="الجروب / السكشن"><select required value={addSubjectForm.defaultId} onChange={(e) => setAddSubjectForm({ ...addSubjectForm, defaultId: e.target.value, courseId: "", termId: "" })}><option value="">اختر النطاق</option>{myDefaults.map((row) => <option key={row.id} value={row.id}>{row.group_code} · {ROLE_LABELS[row.role] || row.role} · {byId(data.years, row.academic_year_id)?.label || ""}</option>)}</select></InputField>
@@ -1096,7 +1099,7 @@ export default function BeVoApp() {
           ) : null}
 
           {activeSection === "tasks" ? (
-            <div className="stack-lg"><div className="page-heading"><div><span className="eyebrow"><ClipboardList size={14} /> التكليفات</span><h1>المهام والتكليفات</h1><p>تابع المهام المنشورة، أو أضف مهمة داخل النطاق الذي تديره.</p></div></div>
+            <div className="stack-lg"><div className="page-heading"><div><span className="eyebrow"><ClipboardList size={14} /> التكليفات</span><h1 data-site-editable="true" data-site-editable-id="tasks-title">المهام والتكليفات</h1><p>تابع المهام المنشورة، أو أضف مهمة داخل النطاق الذي تديره.</p></div></div>
               {isAdmin ? <Panel title="إضافة مهمة" subtitle="المهام لا تظهر للطلاب إلا بعد نشرها." icon={<Plus size={18} />}><form className="form-grid" onSubmit={addTask}>
                 <InputField label="المادة"><select required value={taskForm.offeringId} onChange={(e) => setTaskForm({ ...taskForm, offeringId: e.target.value, groupId: "" })}><option value="">اختر المادة</option>{manageableOfferings.map((row) => <option key={row.id} value={row.id}>{currentCourseName(row.id)} · {byId(data.years, row.academic_year_id)?.label || ""}</option>)}</select></InputField>
                 <InputField label={isGroupScopedOffering(taskForm.offeringId) ? "الجروب / السكشن المعيّن لك" : "الجروب / السكشن (اختياري)"}><select required={isGroupScopedOffering(taskForm.offeringId)} value={taskForm.groupId} onChange={(e) => setTaskForm({ ...taskForm, groupId: e.target.value })}>{isGroupScopedOffering(taskForm.offeringId) ? <option value="">اختر نطاقك</option> : <option value="">كل طلاب المادة</option>}{getGroupsForOffering(taskForm.offeringId).map((group) => <option key={group.id} value={group.id}>{group.code} · {group.name}</option>)}</select></InputField>
@@ -1114,7 +1117,7 @@ export default function BeVoApp() {
           ) : null}
 
           {activeSection === "resources" ? (
-            <div className="stack-lg"><div className="page-heading"><div><span className="eyebrow"><FileText size={14} /> ملفات الشرح</span><h1>المصادر التعليمية</h1><p>روابط Drive وفيديوهات الشرح وقوائم التشغيل المرتبطة بالمواد أو السكاشن.</p></div></div>
+            <div className="stack-lg"><div className="page-heading"><div><span className="eyebrow"><FileText size={14} /> ملفات الشرح</span><h1 data-site-editable="true" data-site-editable-id="resources-title">المصادر التعليمية</h1><p>روابط Drive وفيديوهات الشرح وقوائم التشغيل المرتبطة بالمواد أو السكاشن.</p></div></div>
               {isAdmin ? <Panel title="إضافة مصدر تعليمي" subtitle="استخدم روابط HTTPS صالحة فقط." icon={<Plus size={18} />}><form className="form-grid" onSubmit={addResource}>
                 <InputField label="المادة"><select required value={resourceForm.offeringId} onChange={(e) => setResourceForm({ ...resourceForm, offeringId: e.target.value, groupId: "" })}><option value="">اختر المادة</option>{manageableOfferings.map((row) => <option key={row.id} value={row.id}>{currentCourseName(row.id)}</option>)}</select></InputField>
                 <InputField label={isGroupScopedOffering(resourceForm.offeringId) ? "الجروب / السكشن المعيّن لك" : "النطاق"}><select required={isGroupScopedOffering(resourceForm.offeringId)} value={resourceForm.groupId} onChange={(e) => setResourceForm({ ...resourceForm, groupId: e.target.value })}>{isGroupScopedOffering(resourceForm.offeringId) ? <option value="">اختر نطاقك</option> : <option value="">كل طلاب المادة</option>}{getGroupsForOffering(resourceForm.offeringId).map((group) => <option key={group.id} value={group.id}>{group.code} · {group.name}</option>)}</select></InputField>
@@ -1195,25 +1198,22 @@ function SiteContentEditor({ canEdit, userId }: { canEdit: boolean; userId: stri
     const applyOverrides = () => {
       const body = document.body;
       if (!body) return;
-      const nodes = body.querySelectorAll<HTMLElement>("*");
+      const nodes = body.querySelectorAll<HTMLElement>('[data-site-editable="true"]');
       nodes.forEach((element) => {
-        if (element.closest('[data-site-content-editor-ui="true"]')) return;
-        if (/^(SCRIPT|STYLE|NOSCRIPT|INPUT|TEXTAREA|SELECT|OPTION|SVG|PATH)$/.test(element.tagName)) return;
+        if (element.closest('[data-site-content-editor-ui="true"]') || !isSafeSiteEditableElement(element)) return;
         const textNodes = Array.from(element.childNodes).filter(
           (node): node is Text => node.nodeType === Node.TEXT_NODE && Boolean(node.nodeValue?.trim())
         );
         if (textNodes.length !== 1) return;
+        const key = siteContentKey(element);
+        if (!key) return;
         let originalText = element.dataset.siteEditorOriginal ?? textNodes[0].nodeValue ?? "";
-        let key = element.dataset.siteEditorKey ?? siteContentKey(element, originalText);
         const currentText = textNodes[0].nodeValue ?? "";
         const knownEditedText = overridesRef.current.get(key);
-        // If React reuses an element for a different dynamic record, don't carry the
-        // previous record's edited copy onto the new text.
         if (element.dataset.siteEditorKey && currentText !== originalText && currentText !== knownEditedText) {
           delete element.dataset.siteEditorKey;
           delete element.dataset.siteEditorOriginal;
           originalText = currentText;
-          key = siteContentKey(element, originalText);
         }
         element.dataset.siteEditorKey = key;
         element.dataset.siteEditorOriginal = originalText;
@@ -1227,7 +1227,8 @@ function SiteContentEditor({ canEdit, userId }: { canEdit: boolean; userId: stri
     const loadOverrides = async () => {
       const { data: rows, error } = await supabase
         .from("site_content_overrides")
-        .select("content_key,edited_text");
+        .select("content_key,edited_text")
+        .like("content_key", "static:v2:%");
       if (!alive) return;
       if (error) {
         console.warn("Site content overrides:", error.message);
@@ -1264,11 +1265,12 @@ function SiteContentEditor({ canEdit, userId }: { canEdit: boolean; userId: stri
       let element = origin instanceof Element ? origin as HTMLElement : null;
       while (element && element !== document.body) {
         if (element.closest('[data-site-content-editor-ui="true"]')) return null;
-        if (/^(SCRIPT|STYLE|NOSCRIPT|INPUT|TEXTAREA|SELECT|OPTION|SVG|PATH)$/.test(element.tagName)) return null;
-        const textNodes = Array.from(element.childNodes).filter(
-          (node): node is Text => node.nodeType === Node.TEXT_NODE && Boolean(node.nodeValue?.trim())
-        );
-        if (textNodes.length === 1) return { element, textNode: textNodes[0] };
+        if (element.dataset.siteEditable === "true" && isSafeSiteEditableElement(element)) {
+          const textNodes = Array.from(element.childNodes).filter(
+            (node): node is Text => node.nodeType === Node.TEXT_NODE && Boolean(node.nodeValue?.trim())
+          );
+          if (textNodes.length === 1 && siteContentKey(element)) return { element, textNode: textNodes[0] };
+        }
         element = element.parentElement;
       }
       return null;
@@ -1280,7 +1282,8 @@ function SiteContentEditor({ canEdit, userId }: { canEdit: boolean; userId: stri
       event.stopPropagation();
       event.stopImmediatePropagation();
       const originalText = found.element.dataset.siteEditorOriginal ?? found.textNode.nodeValue ?? "";
-      const key = found.element.dataset.siteEditorKey ?? siteContentKey(found.element, originalText);
+      const key = siteContentKey(found.element);
+      if (!key) return;
       found.element.dataset.siteEditorKey = key;
       found.element.dataset.siteEditorOriginal = originalText;
       selectedElementRef.current = found.element;
@@ -1401,22 +1404,15 @@ function SiteContentEditor({ canEdit, userId }: { canEdit: boolean; userId: stri
   );
 }
 
-function siteContentKey(element: HTMLElement, originalText: string) {
-  const parts: string[] = [];
-  let current: HTMLElement | null = element;
-  while (current && current !== document.body) {
-    const currentNode: HTMLElement = current;
-    const tag = currentNode.tagName.toLowerCase();
-    const currentTagName = currentNode.tagName;
-    const parentElement: HTMLElement | null = currentNode.parentElement;
-    if (!parentElement) break;
-    const siblingElements = Array.from(parentElement.children) as HTMLElement[];
-    const sameTagSiblings = siblingElements.filter((sibling: HTMLElement) => sibling.tagName === currentTagName);
-    parts.unshift(`${tag}:nth-of-type(${sameTagSiblings.indexOf(currentNode) + 1})`);
-    current = parentElement;
-  }
-  const fingerprint = originalText.replace(/\s+/g, " ").trim().slice(0, 240);
-  return `v1:${parts.join(">")}::${fingerprint}`.slice(0, 2000);
+function isSafeSiteEditableElement(element: HTMLElement) {
+  return ["H1", "H2", "H3", "P"].includes(element.tagName) &&
+    !element.closest("a,button,input,textarea,select,label,[role='button']");
+}
+
+function siteContentKey(element: HTMLElement): string | null {
+  const id = element.dataset.siteEditableId || "";
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(id)) return null;
+  return `static:v2:${id}`;
 }
 
 function AdminCourseCatalog({ data, isRoot, isCollegeAdmin, busy, notify, refresh }: {
@@ -1458,7 +1454,7 @@ function AdminCourseCatalog({ data, isRoot, isCollegeAdmin, busy, notify, refres
     finally { setBusyLocal(false); }
   }
   return <div className="stack-lg">
-    <div className="page-heading"><div><span className="eyebrow"><Settings size={14} /> صلاحيات الإدارة</span><h1>الإدارة الأكاديمية</h1><p>أضف الكليات والأعوام والفرق والمواد، ثم اربط المواد بالترم والمواعيد.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
+    <div className="page-heading"><div><span className="eyebrow"><Settings size={14} /> صلاحيات الإدارة</span><h1 data-site-editable="true" data-site-editable-id="academic-admin-title">الإدارة الأكاديمية</h1><p>أضف الكليات والأعوام والفرق والمواد، ثم اربط المواد بالترم والمواعيد.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
     {isRoot ? <Panel title="إضافة كلية" subtitle="الكليات النشطة تظهر في تسجيل الحسابات." icon={<Plus size={18} />}><CollegeCreateForm onCreated={refresh} /></Panel> : null}
     <Panel title="ربط مادة بعام وفرقة وترم" subtitle="يحدد الربط أين تظهر المادة للطلاب، واختيار السكشن مطلوب عند تفعيله." icon={<BookOpen size={18} />}>
       <form className="form-grid" onSubmit={createOffering}>
@@ -1598,12 +1594,12 @@ function YearAdminWorkspace({ data, currentUserId, refresh, notify }: {
   }
   if (!scopeOptions.length) {
     return <div className="stack-lg">
-      <div className="page-heading"><div><span className="eyebrow"><ShieldCheck size={14} /> صلاحيات أدمن السنة</span><h1>الإدارة الأكاديمية</h1><p>صلاحيتك مرتبطة بكلية وسنة وفرقة محددة.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
+      <div className="page-heading"><div><span className="eyebrow"><ShieldCheck size={14} /> صلاحيات أدمن السنة</span><h1 data-site-editable="true" data-site-editable-id="year-admin-scope-title">الإدارة الأكاديمية</h1><p>صلاحيتك مرتبطة بكلية وسنة وفرقة محددة.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
       <EmptyState title="لا يوجد نطاق سنة مكتمل للحساب" detail="اطلب من مدير المنصة إعادة تعيين دور أدمن السنة مع تحديد الكلية والسنة والفرقة." />
     </div>;
   }
   return <div className="stack-lg">
-    <div className="page-heading"><div><span className="eyebrow"><ShieldCheck size={14} /> صلاحيات أدمن السنة</span><h1>إدارة مواد السنة والفرقة</h1><p>تقدر تربط المواد الموجودة وتضيف اختيارات المحاضرات داخل النطاق المعيّن لك فقط.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
+    <div className="page-heading"><div><span className="eyebrow"><ShieldCheck size={14} /> صلاحيات أدمن السنة</span><h1 data-site-editable="true" data-site-editable-id="year-admin-title">إدارة مواد السنة والفرقة</h1><p>تقدر تربط المواد الموجودة وتضيف اختيارات المحاضرات داخل النطاق المعيّن لك فقط.</p></div><button className="btn btn-outline" onClick={refresh}><RefreshCw size={16} /> تحديث</button></div>
     {scopeOptions.length > 1 ? <Panel title="النطاق الإداري" subtitle="اختر واحدة من السنوات والفرق المسندة إلى حسابك." icon={<Layers size={18} />}>
       <InputField label="الكلية · العام · الفرقة"><select value={scopeKey(scope)} onChange={(e) => setSelectedScopeKey(e.target.value)}>{scopeOptions.map((row) => <option key={scopeKey(row)} value={scopeKey(row)}>{byId(data.colleges,row.college_id)?.name || "كلية"} · {byId(data.years,row.academic_year_id)?.label || "سنة"} · {byId(data.levels,row.study_level_id)?.name || "فرقة"}</option>)}</select></InputField>
     </Panel> : null}
