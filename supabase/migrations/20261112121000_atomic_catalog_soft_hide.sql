@@ -25,9 +25,9 @@ BEGIN
     RAISE EXCEPTION 'Not authorized to manage catalog records' USING ERRCODE = '42501';
   END IF;
 
-  IF p_record_id IS NULL OR p_kind NOT IN (
+  IF p_record_id IS NULL OR p_kind IS NULL OR p_kind NOT IN (
     'colleges', 'years', 'levels', 'terms', 'courses', 'offerings', 'lectures'
-  ) THEN
+  ) OR p_is_active IS NULL THEN
     RAISE EXCEPTION 'Invalid catalog target' USING ERRCODE = '22023';
   END IF;
 
