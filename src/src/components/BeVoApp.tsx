@@ -1070,8 +1070,9 @@ export default function BeVoApp() {
           {activeSection === "courses" ? (
             <div className="stack-lg">
               <div className="page-heading"><div><span className="eyebrow"><BookOpen size={14} /> موادك الدراسية</span><h1 data-site-editable="true" data-site-editable-id="student-courses-title">المواد والمحاضرات</h1><p>{isAdmin ? "راجع ربط المواد ومواعيد المحاضرات والسكاشن المتاحة في نطاقك." : "اختار المادة والمحاضرة والسكشن إذا كانت المادة تتطلب سكاشن."}</p></div><button className="btn btn-outline" onClick={refresh} disabled={busy}><RefreshCw size={16} /> تحديث</button></div>
-              {!profile?.college_id ? <EmptyState title="أكمل بياناتك الأكاديمية أولًا" detail="لازم تربط حسابك بالكلية والفرقة قبل عرض المواد." /> : null}
-              {isAdmin ? <AdminCourseCatalog data={data} isRoot={isRoot} isCollegeAdmin={isCollegeAdmin} busy={busy} notify={notify} refresh={refresh} /> : (
+              {!profile?.college_id && !isAdmin ? <EmptyState title="أكمل بياناتك الأكاديمية أولًا" detail="لازم تربط حسابك بالكلية والفرقة قبل عرض المواد." /> : null}
+              {isAdmin ? <AdminCourseCatalog data={data} isRoot={isRoot} isCollegeAdmin={isCollegeAdmin} busy={busy} notify={notify} refresh={refresh} /> : null}
+              {profile?.college_id && profile?.study_level_id ? (
                 <>
                   <Panel title={hasRegistration ? "تعديل التسجيل عبر طلب" : "تسجيل المواد"} subtitle={hasRegistration ? "التسجيل المحفوظ لا يتغير مباشرة؛ أرسل طلب تعديل وانتظر موافقة الأدمن." : "اختار المحاضرة والسكشن لكل مادة ترغب في تسجيلها."} icon={<BookMarked size={18} />}>
                     {studentOfferings.length ? <div className="course-selection-list">{studentOfferings.map((offering) => {
@@ -1101,7 +1102,7 @@ export default function BeVoApp() {
                     })}</tbody></table></div> : <EmptyState title="لم تحفظ موادك بعد" detail="اختار المواد والمحاضرات من الأعلى لإتمام التسجيل." />}
                   </Panel>
                 </>
-              )}
+              ) : !isAdmin ? <EmptyState title="أكمل بياناتك الأكاديمية أولًا" detail="اربط حسابك بالكلية والفرقة حتى تظهر لك المواد والتسجيل." /> : null}
             </div>
           ) : null}
 
