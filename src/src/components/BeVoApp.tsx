@@ -457,9 +457,13 @@ export default function BeVoApp() {
   }
 
   async function claimFirstAdmin() {
+    if (!claimToken.trim()) {
+      notify("أدخل رمز التفعيل أولًا.", "error");
+      return;
+    }
     setBusy(true);
     try {
-      const { error } = await supabase.rpc("claim_initial_super_admin", { p_token: claimToken });
+      const { error } = await supabase.rpc("claim_initial_super_admin", { p_token: claimToken.trim() });
       if (error) throw error;
       setClaimToken("");
       notify("تم تفعيل مدير المنصة.", "success");
@@ -1020,7 +1024,7 @@ export default function BeVoApp() {
                 <div><span className="eyebrow light"><Activity size={14} /> مساحة العمل الأكاديمية</span><h1>أهلًا، {profile?.first_name || user?.email?.split("@")[0] || "بك"} 👋</h1><p>{isAdmin ? "تابع المواد والطلبات والإعدادات ضمن نطاق مسؤوليتك." : "تابع موادك ومحاضراتك وتاسكاتك في مكان واحد."}</p><div className="welcome-actions"><button className="btn btn-white" onClick={() => jump(isAcademicAdmin ? "admin" : isScopeAdmin ? "scope" : "courses")}>{isAcademicAdmin ? "إدارة المنظومة" : isScopeAdmin ? "إدارة الجروب / السكشن" : "موادي الدراسية"} <ArrowLeft size={16} /></button><button className="btn btn-ghost-light" onClick={() => { setGuideStep(0); setGuideOpen(true); }}><CircleHelp size={16} /> جولة تعريفية</button></div></div>
                 <div className="banner-art"><span className="art-circle art-circle-one" /><span className="art-circle art-circle-two" /><div className="art-board"><GraduationCap size={42} /><span>BeVo</span><small>Learn · Organize · Achieve</small></div></div>
               </section>
-              {!allRoles.length ? <Panel title="تفعيل مدير المنصة" subtitle="إن كنت المسؤول الأول عن المنصة، أدخل رمز التهيئة بعد تأكيد بريدك الإلكتروني." icon={<ShieldCheck size={18} />}><form className="inline-form" onSubmit={claimFirstAdmin}><InputField label="رمز التهيئة"><input value={claimToken} onChange={(e) => setClaimToken(e.target.value)} required type="password" /></InputField><button className="btn btn-primary" disabled={busy} type="submit">تفعيل Super Admin</button></form></Panel> : null}
+              {!allRoles.length && !profile?.college_id ? <Panel title="تفعيل مدير المنصة" subtitle="هذا المسار مخصص لتهيئة أول مدير منصة فقط، ويتطلب رمز التهيئة السري." icon={<ShieldCheck size={18} />}><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void claimFirstAdmin(); }}><InputField label="رمز التهيئة"><input value={claimToken} onChange={(e) => setClaimToken(e.target.value)} required type="password" autoComplete="one-time-code" /></InputField><button className="btn btn-primary" disabled={busy || !claimToken.trim()} type="submit">تفعيل Super Admin</button></form></Panel> : null}
               <div className="stats-grid">
                 <div className="stat-card"><span className="stat-icon stat-blue"><BookOpen size={20} /></span><div><small>{isAdmin ? "المواد المتاحة في نطاقك" : "موادي الدراسية"}</small><strong>{isAdmin ? data.offerings.length : mySelections.length}</strong><span>{isAdmin ? "ربط أكاديمي" : "مادة مسجلة"}</span></div></div>
                 <div className="stat-card"><span className="stat-icon stat-violet"><ClipboardList size={20} /></span><div><small>المهام المفتوحة</small><strong>{data.tasks.filter((task) => task.is_published).length}</strong><span>تاسك وتكليف</span></div></div>
