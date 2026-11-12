@@ -276,7 +276,14 @@ export default function BeVoApp() {
     selectedYearIds.includes(offering.academic_year_id) &&
     Boolean(byId(data.terms, offering.term_id)?.is_active)
   );
-  const currentStudentOfferingIds = new Set(studentOfferings.map((offering) => offering.id));
+  const currentStudentYearIds = new Set(data.years
+    .filter((year) => year.college_id === profile?.college_id && year.is_current && year.is_active)
+    .map((year) => year.id)
+  );
+  const currentStudentOfferingIds = new Set(data.offerings
+    .filter((offering) => offering.college_id === profile?.college_id && currentStudentYearIds.has(offering.academic_year_id))
+    .map((offering) => offering.id)
+  );
   const mySelections = data.selections.filter((selection) =>
     selection.student_id === currentUserId && currentStudentOfferingIds.has(selection.offering_id)
   );
