@@ -863,7 +863,7 @@ export default function BeVoApp() {
   }
   const currentSectionLabel = navItems.find((item) => item.id === activeSection)?.label || "نظرة عامة";
   const isPasswordResetRoute =
-    typeof window !== "undefined" && window.location.pathname.replace(/\\/+$/, "") === "/reset-password";
+    typeof window !== "undefined" && (window.location.pathname === "/reset-password" || window.location.pathname === "/reset-password/");
 
   if (isPasswordResetRoute && !authReady) {
     return (
