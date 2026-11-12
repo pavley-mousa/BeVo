@@ -215,61 +215,13 @@ export default function AdminDataManager({
     }
   }
 
-  async function markInactive(table: string, ids: string[]) {
-    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
-    if (!uniqueIds.length) return;
-    const { error } = await supabase.from(table).update({ is_active: false }).in("id", uniqueIds);
-    if (error) throw error;
-  }
-
-  async function deactivateDependents(nextKind: CatalogKind, row: CatalogRow) {
-    const lectureIdsFor = (offeringIds: string[]) => data.lectures
-      .filter((lecture) => offeringIds.includes(lecture.offering_id)).map((lecture) => lecture.id);
-    if (nextKind === "colleges") {
-      const yearIds = data.years.filter((year) => year.college_id === row.id).map((year) => year.id);
-      const levelIds = data.levels.filter((level) => level.college_id === row.id).map((level) => level.id);
-      const courseIds = data.courses.filter((course) => course.college_id === row.id).map((course) => course.id);
-      const termIds = data.terms.filter((term) => yearIds.includes(term.academic_year_id)).map((term) => term.id);
-      const offeringIds = data.offerings.filter((offering) =>
-        offering.college_id === row.id || yearIds.includes(offering.academic_year_id) ||
-        levelIds.includes(offering.study_level_id) || courseIds.includes(offering.course_id) || termIds.includes(offering.term_id)
-      ).map((offering) => offering.id);
-      await markInactive("lecture_options", lectureIdsFor(offeringIds));
-      await markInactive("course_offerings", offeringIds);
-      await markInactive("terms", termIds);
-      await markInactive("courses", courseIds);
-      await markInactive("study_levels", levelIds);
-      await markInactive("academic_years", yearIds);
-    } else if (nextKind === "years") {
-      const termIds = data.terms.filter((term) => term.academic_year_id === row.id).map((term) => term.id);
-      const offeringIds = data.offerings.filter((offering) => offering.academic_year_id === row.id || termIds.includes(offering.term_id)).map((offering) => offering.id);
-      await markInactive("lecture_options", lectureIdsFor(offeringIds));
-      await markInactive("course_offerings", offeringIds);
-      await markInactive("terms", termIds);
-    } else if (nextKind === "levels") {
-      const offeringIds = data.offerings.filter((offering) => offering.study_level_id === row.id).map((offering) => offering.id);
-      await markInactive("lecture_options", lectureIdsFor(offeringIds));
-      await markInactive("course_offerings", offeringIds);
-    } else if (nextKind === "terms") {
-      const offeringIds = data.offerings.filter((offering) => offering.term_id === row.id).map((offering) => offering.id);
-      await markInactive("lecture_options", lectureIdsFor(offeringIds));
-      await markInactive("course_offerings", offeringIds);
-    } else if (nextKind === "courses") {
-      const offeringIds = data.offerings.filter((offering) => offering.course_id === row.id).map((offering) => offering.id);
-      await markInactive("lecture_options", lectureIdsFor(offeringIds));
-      await markInactive("course_offerings", offeringIds);
-    } else if (nextKind === "offerings") {
-      await markInactive("lecture_options", lectureIdsFor([row.id]));
-    }
-  }
-
   async function toggleActive(nextKind: CatalogKind, row: CatalogRow) {
     const restoring = row.is_active === false;
     const title = recordTitle(nextKind, row, data);
     if (!restoring) {
       let message = "هيتم إخفاء «" + title + "» من العناصر النشطة مع الاحتفاظ بالسجلات المرتبطة.";
-      if (nextKind === "colleges") message = "هيتم إخفاء الكلية وكل السنوات والفرق والمواد والمواعيد المرتبطة بها. السجلات لن تُمسح نهائيًا. هل تريد المتابعة؟";
-      else if (["years", "levels", "terms", "courses", "offerings"].includes(nextKind)) message = "هيتم إخفاء «" + title + "» والروابط/المواعيد التابعة له مع الاحتفاظ بالسجلات. هل تريد المتابعة؟";
+      if (nextKind === "colleges") message = "هيتم إخفاء الكلية وكل السنوات والفرق والمواد والمواعيد والجروبات والسكاشن المرتبطة بها. السجلات لن تُمسح نهائيًا. هل تريد المتابعة؟";
+      else if (["years", "levels", "terms", "courses", "offerings"].includes(nextKind)) message = "هيتم إخفاء «" + title + "» وكل الروابط والمواعيد والجروبات التابعة له مع الاحتفاظ بالسجلات. هل تريد المتابعة؟";
       if (!window.confirm(message)) return;
     } else if (nextKind === "years" && row.is_current && data.years.some((year) =>
       year.id !== row.id && year.college_id === row.college_id && year.is_current && year.is_active
@@ -280,14 +232,16 @@ export default function AdminDataManager({
 
     setBusy(true);
     try {
-      if (!restoring) await deactivateDependents(nextKind, row);
-      const { data: saved, error } = await supabase.from(TABLES[nextKind])
-        .update({ is_active: restoring }).eq("id", row.id).select("id").maybeSingle();
+      const { data: saved, error } = await supabase.rpc("super_admin_toggle_catalog_active", {
+        p_kind: nextKind,
+        p_record_id: row.id,
+        p_is_active: restoring,
+      });
       if (error) throw error;
-      if (!saved) throw new Error("لم يتغير السجل. تأكد أن حسابك لديه صلاحية إدارة البيانات.");
+      if (saved !== true) throw new Error("لم يتغير السجل. تأكد أن حسابك لديه صلاحية إدارة البيانات.");
       notify(restoring
         ? "تمت استعادة العنصر. العناصر التابعة التي أُخفيت معه تحتاج استعادة منفصلة من قائمتها."
-        : "تم إخفاء العنصر بنجاح، مع الاحتفاظ بسجلاته المرتبطة.");
+        : "تم إخفاء العنصر وكل السجلات التابعة له في عملية واحدة.");
       setActiveMenu(null);
       refresh();
     } catch (error) {
