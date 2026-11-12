@@ -105,7 +105,7 @@ export default function BeVoApp() {
   });
   const [profileDraft, setProfileDraft] = useState({ first: "", middle: "", third: "", studentId: "", collegeId: "", levelId: "", year: "" });
   const [claimToken, setClaimToken] = useState("");
-  const [skipProfileSetup, setSkipProfileSetup] = useState(false);
+  const [showAdminClaim, setShowAdminClaim] = useState(false);
   const [selectedChoices, setSelectedChoices] = useState<Record<string, { lectureId: string; groupId: string }>>({});
   const [changeReason, setChangeReason] = useState("");
 
@@ -456,8 +456,7 @@ export default function BeVoApp() {
     finally { setBusy(false); }
   }
 
-  async function claimFirstAdmin(event: FormEvent) {
-    event.preventDefault();
+  async function claimFirstAdmin() {
     setBusy(true);
     try {
       const { error } = await supabase.rpc("claim_initial_super_admin", { p_token: claimToken });
@@ -930,7 +929,7 @@ export default function BeVoApp() {
     );
   }
 
-  if (profile && !profile.college_id && !isRoot && !skipProfileSetup) {
+  if (profile && !profile.college_id && !isRoot) {
     return (
       <main className="profile-setup-page" dir="rtl" lang="ar">
         <div className="brand-lockup dark"><span className="brand-mark">B</span><div><strong>BeVo</strong><small>إكمال البيانات الأكاديمية</small></div></div>
@@ -950,7 +949,40 @@ export default function BeVoApp() {
           <InputField label="سنة الالتحاق"><input value={profileDraft.year} onChange={(e) => setProfileDraft({ ...profileDraft, year: e.target.value })} /></InputField>
           <button className="btn btn-primary btn-wide" disabled={busy} type="submit">{busy ? "جاري الحفظ…" : "حفظ البيانات"} <Check size={17} /></button>
           <div className="setup-extra-actions">
-            <button type="button" className="text-button" onClick={() => setSkipProfileSetup(true)}>أنا مدير المنصة الأول — تفعيل Super Admin</button>
+            {showAdminClaim ? (
+              <div className="stack-sm">
+                <InputField label="رمز التفعيل الأولي لـ Super Admin">
+                  <input
+                    required
+                    type="password"
+                    autoComplete="one-time-code"
+                    value={claimToken}
+                    onChange={(event) => setClaimToken(event.target.value)}
+                    placeholder="أدخل رمز التفعيل"
+                  />
+                </InputField>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-wide"
+                  disabled={busy || !claimToken.trim()}
+                  onClick={claimFirstAdmin}
+                >
+                  {busy ? "جاري التحقق…" : "التحقق وتفعيل المدير"}
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => { setShowAdminClaim(false); setClaimToken(""); }}
+                >
+                  إلغاء
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="text-button" onClick={() => setShowAdminClaim(true)}>
+                لدي رمز التفعيل الأولي لمدير المنصة
+              </button>
+            )}
             <button type="button" className="text-button setup-logout" onClick={signOut}>تسجيل الخروج</button>
           </div>
         </form>
