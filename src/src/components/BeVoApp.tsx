@@ -55,6 +55,27 @@ function messageOf(error: unknown) {
   if (error && typeof error === "object" && "message" in error) return String((error as { message: unknown }).message);
   return String(error || "حصل خطأ غير متوقع.");
 }
+function getAuthRedirectUrl(): string | undefined {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+
+  if (configuredSiteUrl) {
+    try {
+      const parsedUrl = new URL(configuredSiteUrl);
+      const isSecure = parsedUrl.protocol === "https:";
+      const isLocalDevelopment =
+        parsedUrl.protocol === "http:" &&
+        (parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1");
+
+      if (isSecure || isLocalDevelopment) return parsedUrl.origin;
+      console.error("NEXT_PUBLIC_SITE_URL must use HTTPS outside local development.");
+    } catch {
+      console.error("NEXT_PUBLIC_SITE_URL must be a valid URL.");
+    }
+  }
+
+  return typeof window !== "undefined" ? window.location.origin : undefined;
+}
+
 function byId(rows: Row[], id: string | null | undefined) {
   return rows.find((row) => row.id === id);
 }
@@ -334,7 +355,7 @@ export default function BeVoApp() {
         email, password: signupDraft.password,
         options: {
           data: { first_name: signupDraft.first, middle_name: signupDraft.middle, third_name: signupDraft.third },
-          emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+          emailRedirectTo: getAuthRedirectUrl(),
         },
       });
       if (error) throw error;
@@ -386,7 +407,7 @@ export default function BeVoApp() {
     setBusy(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim().toLowerCase(), {
-        redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        redirectTo: getAuthRedirectUrl(),
       });
       if (error) throw error;
       notify("لو كان البريد مسجلًا، ستصلك رسالة استعادة كلمة المرور.", "success");
@@ -422,7 +443,7 @@ export default function BeVoApp() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+        options: { redirectTo: getAuthRedirectUrl() },
       });
       if (error) throw error;
     } catch (error) { notify(messageOf(error), "error"); setBusy(false); }
