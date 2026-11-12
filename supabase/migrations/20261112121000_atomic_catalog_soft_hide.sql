@@ -232,3 +232,58 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.super_admin_toggle_catalog_active(text, uuid, boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.super_admin_toggle_catalog_active(text, uuid, boolean) TO authenticated;
+
+-- Enforce a maximum of four active lecture choices for each offering.
+-- Locking the parent offering serializes concurrent inserts/activations.
+CREATE OR REPLACE FUNCTION private.enforce_active_lecture_option_limit()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_offering_id uuid;
+  v_active_count integer := 0;
+BEGIN
+  IF NEW.is_active IS NOT TRUE THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT o.id INTO v_offering_id
+  FROM public.course_offerings o
+  WHERE o.id = NEW.offering_id
+    AND o.is_active
+  FOR UPDATE;
+
+  IF v_offering_id IS NULL THEN
+    RAISE EXCEPTION 'Course offering is inactive or does not exist' USING ERRCODE = '23514';
+  END IF;
+
+  IF NEW.starts_at IS NULL OR NEW.ends_at IS NULL OR NEW.ends_at <= NEW.starts_at THEN
+    RAISE EXCEPTION 'Lecture end time must be later than start time' USING ERRCODE = '23514';
+  END IF;
+
+  SELECT count(*) INTO v_active_count
+  FROM public.lecture_options existing
+  WHERE existing.offering_id = NEW.offering_id
+    AND existing.is_active IS TRUE
+    AND existing.id IS DISTINCT FROM NEW.id;
+
+  IF v_active_count >= 4 THEN
+    RAISE EXCEPTION 'An offering cannot have more than four active lecture options' USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.enforce_active_lecture_option_limit() FROM PUBLIC;
+
+DROP TRIGGER IF EXISTS enforce_active_lecture_option_limit
+  ON public.lecture_options;
+
+CREATE TRIGGER enforce_active_lecture_option_limit
+  BEFORE INSERT OR UPDATE OF offering_id, is_active, starts_at, ends_at
+  ON public.lecture_options
+  FOR EACH ROW
+  EXECUTE FUNCTION private.enforce_active_lecture_option_limit();
